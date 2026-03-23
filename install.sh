@@ -1,9 +1,9 @@
 #!/bin/bash
 # install.sh — c-daily one-command installer
-# curl -fsSL https://raw.githubusercontent.com/Atsushi Hatakeyama/c-daily/main/install.sh | bash
+# curl -fsSL https://raw.githubusercontent.com/atsushi729/c-daily/main/install.sh | bash
 set -euo pipefail
 
-REPO="https://github.com/Atsushi Hatakeyama/c-daily"
+REPO="https://github.com/atsushi729/c-daily"
 INSTALL_DIR="${HOME}/.local/share/c-daily"
 BIN_DIR="${HOME}/.local/bin"
 

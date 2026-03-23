@@ -39,14 +39,14 @@
 ### Option 1: curl (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Atsushi Hatakeyama/c-daily/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/atsushi729/c-daily/main/install.sh | bash
 c-daily install
 ```
 
 ### Option 2: Homebrew
 
 ```bash
-brew tap Atsushi Hatakeyama/c-daily
+brew tap atsushi729/c-daily
 brew install c-daily
 c-daily install
 ```
@@ -54,7 +54,7 @@ c-daily install
 ### Option 3: git clone
 
 ```bash
-git clone https://github.com/Atsushi Hatakeyama/c-daily ~/.local/share/c-daily
+git clone https://github.com/atsushi729/c-daily ~/.local/share/c-daily
 ln -sf ~/.local/share/c-daily/bin/c-daily ~/.local/bin/c-daily
 c-daily install
 ```

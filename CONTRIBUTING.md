@@ -5,7 +5,7 @@ Contributions to c-daily are welcome!
 ## Development Setup
 
 ```bash
-git clone https://github.com/Atsushi Hatakeyama/c-daily
+git clone https://github.com/atsushi729/c-daily
 cd c-daily
 pip install pytest
 pytest tests/ -v
@@ -13,9 +13,10 @@ pytest tests/ -v
 
 ## Reporting Issues
 
-Please report bugs and feature requests via [GitHub Issues](https://github.com/Atsushi Hatakeyama/c-daily/issues).
+Please report bugs and feature requests via [GitHub Issues](https://github.com/atsushi729/c-daily/issues).
 
 **Please include the following when reporting a bug:**
+
 - OS and version (output of `sw_vers`)
 - Python version (`python3 --version`)
 - Claude Code version
