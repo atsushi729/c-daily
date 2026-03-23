@@ -6,7 +6,7 @@ LOG_DIR="${C_DAILY_LOG_DIR:-${HOME}/.daily-logs}"
 mkdir -p "${LOG_DIR}/raw"
 
 PAYLOAD_FILE=$(mktemp)
-trap "rm -f '$PAYLOAD_FILE'" EXIT
+trap 'rm -f "$PAYLOAD_FILE"' EXIT
 cat > "$PAYLOAD_FILE"
 
 python3 - "$PAYLOAD_FILE" "$LOG_DIR" <<'PYEOF'
