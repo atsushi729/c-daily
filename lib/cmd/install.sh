@@ -20,7 +20,6 @@ _check_dep python3
 _check_dep git
 
 PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-REQUIRED="3.9"
 if python3 -c "import sys; exit(0 if sys.version_info >= (3,9) else 1)"; then
   echo "✅ Python ${PYTHON_VERSION}"
 else

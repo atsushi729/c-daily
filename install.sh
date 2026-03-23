@@ -4,7 +4,6 @@
 set -euo pipefail
 
 REPO="https://github.com/Atsushi Hatakeyama/c-daily"
-RAW="https://raw.githubusercontent.com/Atsushi Hatakeyama/c-daily/main"
 INSTALL_DIR="${HOME}/.local/share/c-daily"
 BIN_DIR="${HOME}/.local/bin"
 
