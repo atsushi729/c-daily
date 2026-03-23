@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 c-daily aggregate.py
-JSONL rawログ → 日次Markdown生成
+JSONL raw log → daily Markdown generator
 """
 import json
 import sys
@@ -39,28 +39,28 @@ def build_md(target_date: str, records: list[dict]) -> str:
     lines = [f"# 📋 Daily Log — {target_date}", ""]
 
     if not records:
-        lines.append("> この日のログはありません。")
+        lines.append("> No logs for this day.")
         return "\n".join(lines)
 
     by_type: dict[str, list] = defaultdict(list)
     for r in records:
         by_type[r.get("type", "other")].append(r)
 
-    # --- サマリー ---
+    # --- Summary ---
     lines += [
-        "## 📊 サマリー", "",
-        "| 種別 | 件数 |",
-        "|------|------|",
-        f"| ✏️ ファイル編集   | {len(by_type['file_edit'])} |",
-        f"| ⚡ コマンド実行   | {len(by_type['command'])} |",
-        f"| 💬 会話セッション | {len(by_type['session_summary'])} |",
-        f"| 🌿 Gitコミット    | {len(by_type['git'])} |",
-        f"| **合計**         | **{len(records)}** |",
+        "## 📊 Summary", "",
+        "| Type | Count |",
+        "|------|-------|",
+        f"| ✏️ File Edits      | {len(by_type['file_edit'])} |",
+        f"| ⚡ Commands Run    | {len(by_type['command'])} |",
+        f"| 💬 Chat Sessions   | {len(by_type['session_summary'])} |",
+        f"| 🌿 Git Commits     | {len(by_type['git'])} |",
+        f"| **Total**          | **{len(records)}** |",
         "",
     ]
 
-    # --- タイムライン ---
-    lines += ["## ⏱️ タイムライン", ""]
+    # --- Timeline ---
+    lines += ["## ⏱️ Timeline", ""]
     prev_hour = None
     for r in sorted(records, key=lambda r: r.get("timestamp", "")):
         t    = fmt_time(r.get("timestamp", ""))
@@ -71,9 +71,9 @@ def build_md(target_date: str, records: list[dict]) -> str:
         lines.append(f"- `{t}` {r.get('summary', '')}")
     lines.append("")
 
-    # --- 編集ファイル一覧 ---
+    # --- Edited files ---
     if by_type["file_edit"]:
-        lines += ["## ✏️ 編集ファイル", ""]
+        lines += ["## ✏️ Edited Files", ""]
         path_times: dict[str, list] = defaultdict(list)
         for r in by_type["file_edit"]:
             path_times[r.get("path", "")].append(fmt_time(r.get("timestamp", "")))
@@ -81,16 +81,16 @@ def build_md(target_date: str, records: list[dict]) -> str:
             lines.append(f"- `{path}` _{', '.join(times)}_")
         lines.append("")
 
-    # --- コマンド履歴 ---
+    # --- Command history ---
     if by_type["command"]:
-        lines += ["## ⚡ 実行コマンド", ""]
+        lines += ["## ⚡ Commands Run", ""]
         for r in by_type["command"]:
             lines.append(f"- `{fmt_time(r.get('timestamp',''))}` `{r.get('command','')}`")
         lines.append("")
 
-    # --- 会話サマリー ---
+    # --- Session summary ---
     if by_type["session_summary"]:
-        lines += ["## 💬 Claude Code セッション", ""]
+        lines += ["## 💬 Claude Code Sessions", ""]
         for r in by_type["session_summary"]:
             t     = fmt_time(r.get("timestamp", ""))
             msg   = r.get("first_msg", "")
@@ -101,9 +101,9 @@ def build_md(target_date: str, records: list[dict]) -> str:
             lines.append(f"- `{t}` {msg}{meta_str}")
         lines.append("")
 
-    # --- Gitコミット ---
+    # --- Git commits ---
     if by_type["git"]:
-        lines += ["## 🌿 Git コミット", ""]
+        lines += ["## 🌿 Git Commits", ""]
         for r in by_type["git"]:
             t    = fmt_time(r.get("timestamp", ""))
             repo = r.get("repo", "")
@@ -122,7 +122,7 @@ def main() -> None:
     out = LOG_BASE / f"{target}.md"
     LOG_BASE.mkdir(parents=True, exist_ok=True)
     out.write_text(build_md(target, records), encoding="utf-8")
-    print(f"✅ {out} ({len(records)} 件)")
+    print(f"✅ {out} ({len(records)} records)")
 
 
 if __name__ == "__main__":

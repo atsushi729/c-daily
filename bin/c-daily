@@ -8,20 +8,20 @@ C_DAILY_LOG_DIR="${C_DAILY_LOG_DIR:-${HOME}/.daily-logs}"
 
 _usage() {
   cat <<EOF
-c-daily v${C_DAILY_VERSION} — Claude Code 日次ログ自動生成ツール
+c-daily v${C_DAILY_VERSION} — Claude Code daily log auto-generator
 
 Usage:
-  c-daily install            Claude Code hookとlaunchdを設定
-  c-daily today              今日のログを生成して開く
-  c-daily show [DATE]        指定日のログを生成して開く (例: 2026-03-22)
-  c-daily status             hookとlaunchdの動作状況を確認
-  c-daily raw [DATE]         生ログ(JSONL)をそのまま表示
-  c-daily uninstall          全設定を削除
-  c-daily version            バージョンを表示
-  c-daily help               このヘルプを表示
+  c-daily install            Set up Claude Code hooks and launchd
+  c-daily today              Generate and open today's log
+  c-daily show [DATE]        Generate and open log for a specific date (e.g. 2026-03-22)
+  c-daily status             Check hook and launchd status
+  c-daily raw [DATE]         Display raw log (JSONL)
+  c-daily uninstall          Remove all settings
+  c-daily version            Show version
+  c-daily help               Show this help
 
-環境変数:
-  C_DAILY_LOG_DIR   ログ保存先ディレクトリ (デフォルト: ~/.daily-logs)
+Environment variables:
+  C_DAILY_LOG_DIR   Log storage directory (default: ~/.daily-logs)
 EOF
 }
 
@@ -52,7 +52,7 @@ case "$CMD" in
     if [ -f "$RAW" ]; then
       cat "$RAW"
     else
-      echo "⚠️  ログファイルが見つかりません: $RAW"
+      echo "⚠️  Log file not found: $RAW"
       exit 1
     fi
     ;;
@@ -60,7 +60,7 @@ case "$CMD" in
   version)   echo "c-daily v${C_DAILY_VERSION}" ;;
   help|--help|-h) _usage ;;
   *)
-    echo "❌ 不明なコマンド: $CMD"
+    echo "❌ Unknown command: $CMD"
     echo ""
     _usage
     exit 1

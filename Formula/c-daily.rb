@@ -1,8 +1,8 @@
 class CDaily < Formula
-  desc "Claude Code 日次ログ自動生成ツール"
+  desc "Claude Code daily log auto-generator"
   homepage "https://github.com/Atsushi Hatakeyama/c-daily"
   url "https://github.com/Atsushi Hatakeyama/c-daily/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "REPLACE_WITH_ACTUAL_SHA256"  # gh release upload 後に sha256sum で取得
+  sha256 "REPLACE_WITH_ACTUAL_SHA256"  # obtain with sha256sum after uploading gh release
   license "MIT"
 
   depends_on "python@3.11"
@@ -10,7 +10,7 @@ class CDaily < Formula
   def install
     libexec.install Dir["*"]
 
-    # bin/c-daily のシェバンとパスを書き換え
+    # Rewrite shebang and path in bin/c-daily
     (bin/"c-daily").write <<~EOS
       #!/bin/bash
       export C_DAILY_LIB="#{libexec}/lib"
@@ -23,20 +23,20 @@ class CDaily < Formula
   end
 end
 
-# --- Homebrew Tap としての配布方法 ---
+# --- Distribution as a Homebrew Tap ---
 #
-# 1. GitHub に homebrew-c-daily リポジトリを作成
+# 1. Create a homebrew-c-daily repository on GitHub:
 #    https://github.com/Atsushi Hatakeyama/homebrew-c-daily
 #
-# 2. このファイルを Formula/c-daily.rb として配置
+# 2. Place this file as Formula/c-daily.rb
 #
-# 3. タグ付きリリースを作成:
+# 3. Create a tagged release:
 #    git tag v0.1.0
 #    git push origin v0.1.0
 #
-# 4. sha256 を更新:
+# 4. Update sha256:
 #    curl -L https://github.com/Atsushi Hatakeyama/c-daily/archive/refs/tags/v0.1.0.tar.gz | sha256sum
 #
-# 5. ユーザーはこれだけでインストールできる:
+# 5. Users can then install with:
 #    brew tap Atsushi Hatakeyama/c-daily
 #    brew install c-daily

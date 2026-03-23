@@ -1,8 +1,8 @@
 # Contributing to c-daily
 
-c-daily へのコントリビューションを歓迎します！
+Contributions to c-daily are welcome!
 
-## 開発環境のセットアップ
+## Development Setup
 
 ```bash
 git clone https://github.com/Atsushi Hatakeyama/c-daily
@@ -11,40 +11,40 @@ pip install pytest
 pytest tests/ -v
 ```
 
-## Issue の報告
+## Reporting Issues
 
-バグ報告・機能リクエストは [GitHub Issues](https://github.com/Atsushi Hatakeyama/c-daily/issues) へ。
+Please report bugs and feature requests via [GitHub Issues](https://github.com/Atsushi Hatakeyama/c-daily/issues).
 
-**バグ報告時に含めてほしい情報:**
-- OS とバージョン (`sw_vers` の出力)
-- Python バージョン (`python3 --version`)
-- Claude Code バージョン
-- `c-daily status` の出力
-- 再現手順と期待する動作
+**Please include the following when reporting a bug:**
+- OS and version (output of `sw_vers`)
+- Python version (`python3 --version`)
+- Claude Code version
+- Output of `c-daily status`
+- Steps to reproduce and expected behavior
 
-## Pull Request
+## Pull Requests
 
-1. このリポジトリを Fork する
-2. feature ブランチを切る: `git checkout -b feat/my-feature`
-3. テストを書いて通す: `pytest tests/`
-4. コミット: [Conventional Commits](https://www.conventionalcommits.org/) 形式で
-   - `feat:` 新機能
-   - `fix:` バグ修正
-   - `docs:` ドキュメントのみの変更
-   - `test:` テストの追加・修正
-   - `chore:` ビルド・CI等
-5. PR を送る
+1. Fork this repository
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Write tests and make them pass: `pytest tests/`
+4. Commit using [Conventional Commits](https://www.conventionalcommits.org/) format:
+   - `feat:` new feature
+   - `fix:` bug fix
+   - `docs:` documentation-only change
+   - `test:` adding or updating tests
+   - `chore:` build, CI, etc.
+5. Open a PR
 
-## 将来のロードマップ（コントリビューション歓迎）
+## Roadmap (contributions welcome)
 
-- [ ] Linux (systemd timer) 対応
-- [ ] Git hook の自動設定
-- [ ] Obsidian vault への出力
-- [ ] 週次サマリー (`c-daily weekly`)
-- [ ] 複数プロジェクト対応
+- [ ] Linux (systemd timer) support
+- [ ] Automatic Git hook setup
+- [ ] Obsidian vault output
+- [ ] Weekly summary (`c-daily weekly`)
+- [ ] Multi-project support
 
-## コードの方針
+## Code Guidelines
 
-- **シェルスクリプト**: POSIX準拠、`shellcheck` を通す
-- **Python**: 標準ライブラリのみ使用（外部依存なし）、型ヒントを推奨
-- **テスト**: `pytest`、新機能には必ずテストを追加
+- **Shell scripts**: POSIX-compliant, pass `shellcheck`
+- **Python**: standard library only (no external dependencies), type hints encouraged
+- **Tests**: `pytest`, all new features must include tests

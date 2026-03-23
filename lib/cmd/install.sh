@@ -1,18 +1,18 @@
 #!/bin/bash
-# lib/cmd/install.sh — c-daily install サブコマンド
+# lib/cmd/install.sh — c-daily install subcommand
 set -euo pipefail
 
 C_DAILY_LIB="$(cd "$(dirname "$0")/.." && pwd)"
 C_DAILY_LOG_DIR="${C_DAILY_LOG_DIR:-${HOME}/.daily-logs}"
 CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
 
-echo "🔧 c-daily セットアップを開始します..."
+echo "🔧 Starting c-daily setup..."
 echo ""
 
-# --- 依存チェック ---
+# --- Dependency check ---
 _check_dep() {
   if ! command -v "$1" &>/dev/null; then
-    echo "❌ $1 が見つかりません。インストールしてください。"
+    echo "❌ $1 not found. Please install it."
     exit 1
   fi
 }
@@ -24,24 +24,24 @@ REQUIRED="3.9"
 if python3 -c "import sys; exit(0 if sys.version_info >= (3,9) else 1)"; then
   echo "✅ Python ${PYTHON_VERSION}"
 else
-  echo "❌ Python 3.9 以上が必要です (現在: ${PYTHON_VERSION})"
+  echo "❌ Python 3.9 or higher required (current: ${PYTHON_VERSION})"
   exit 1
 fi
 
-# --- ディレクトリ作成 ---
+# --- Create directories ---
 mkdir -p "${C_DAILY_LOG_DIR}/raw"
-echo "✅ ログディレクトリ: ${C_DAILY_LOG_DIR}"
+echo "✅ Log directory: ${C_DAILY_LOG_DIR}"
 
-# --- hookスクリプトをコピー ---
+# --- Copy hook scripts ---
 mkdir -p "${C_DAILY_LOG_DIR}/scripts/hooks"
 cp "$C_DAILY_LIB/hooks/post-tool.sh"       "${C_DAILY_LOG_DIR}/scripts/hooks/"
 cp "$C_DAILY_LIB/hooks/session-summary.sh" "${C_DAILY_LOG_DIR}/scripts/hooks/"
 chmod +x "${C_DAILY_LOG_DIR}/scripts/hooks/post-tool.sh"
 chmod +x "${C_DAILY_LOG_DIR}/scripts/hooks/session-summary.sh"
 cp "$C_DAILY_LIB/aggregate.py" "${C_DAILY_LOG_DIR}/scripts/"
-echo "✅ hookスクリプトをコピー"
+echo "✅ Hook scripts copied"
 
-# --- Claude Code settings.json にhookを追記 ---
+# --- Add hooks to Claude Code settings.json ---
 mkdir -p "${HOME}/.claude"
 
 HOOK_SNIPPET=$(cat <<'JSON'
@@ -75,12 +75,12 @@ JSON
 
 if [ ! -f "$CLAUDE_SETTINGS" ]; then
   echo "$HOOK_SNIPPET" > "$CLAUDE_SETTINGS"
-  echo "✅ Claude Code settings.json を作成"
+  echo "✅ Claude Code settings.json created"
 else
-  # 既存ファイルにhooksキーがあるかチェック
+  # Check if existing file already has a hooks key
   if python3 -c "import json,sys; d=json.load(open('$CLAUDE_SETTINGS')); sys.exit(0 if 'hooks' in d else 1)" 2>/dev/null; then
-    echo "⚠️  ~/.claude/settings.json に既に 'hooks' キーがあります。"
-    echo "   手動でマージしてください:"
+    echo "⚠️  ~/.claude/settings.json already has a 'hooks' key."
+    echo "   Please merge manually:"
     echo ""
     echo "$HOOK_SNIPPET"
     echo ""
@@ -93,12 +93,12 @@ hook_config = json.loads('''$HOOK_SNIPPET''')
 existing.update(hook_config)
 with open('$CLAUDE_SETTINGS', 'w') as f:
     json.dump(existing, f, indent=2, ensure_ascii=False)
-print("✅ Claude Code settings.json にhookを追記")
+print("✅ Hooks added to Claude Code settings.json")
 PYEOF
   fi
 fi
 
-# --- launchd 登録（macOSのみ） ---
+# --- Register launchd (macOS only) ---
 if [[ "$(uname)" == "Darwin" ]]; then
   PLIST_DST="${HOME}/Library/LaunchAgents/com.c-daily.aggregate.plist"
   PYTHON_PATH=$(which python3)
@@ -132,12 +132,12 @@ PLIST
 
   launchctl unload "$PLIST_DST" 2>/dev/null || true
   launchctl load "$PLIST_DST"
-  echo "✅ launchd 登録完了 (毎日 23:58 に自動実行)"
+  echo "✅ launchd registered (auto-run daily at 23:58)"
 fi
 
-# --- 完了メッセージ ---
+# --- Done ---
 echo ""
-echo "🎉 セットアップ完了！"
+echo "🎉 Setup complete!"
 echo ""
-echo "  c-daily today    → 今日のログを今すぐ生成"
-echo "  c-daily status   → 動作確認"
+echo "  c-daily today    → generate today's log now"
+echo "  c-daily status   → check status"

@@ -2,23 +2,23 @@
 # lib/cmd/uninstall.sh
 set -euo pipefail
 
-echo "🗑️  c-daily をアンインストールします..."
+echo "🗑️  Uninstalling c-daily..."
 
-# launchd解除
+# Unregister launchd
 if [[ "$(uname)" == "Darwin" ]]; then
   PLIST="${HOME}/Library/LaunchAgents/com.c-daily.aggregate.plist"
   if [ -f "$PLIST" ]; then
     launchctl unload "$PLIST" 2>/dev/null || true
     rm -f "$PLIST"
-    echo "✅ launchd 解除"
+    echo "✅ launchd unregistered"
   fi
 fi
 
-# hookスクリプト削除
+# Remove hook scripts
 rm -rf "${HOME}/.daily-logs/scripts"
-echo "✅ hookスクリプト削除"
+echo "✅ Hook scripts removed"
 
-# Claude Code settings.jsonからhook設定を除去
+# Remove hook config from Claude Code settings.json
 SETTINGS="${HOME}/.claude/settings.json"
 if [ -f "$SETTINGS" ]; then
   python3 - <<'PYEOF'
@@ -29,11 +29,11 @@ with open(path) as f:
 d.pop("hooks", None)
 with open(path, "w") as f:
     json.dump(d, f, indent=2, ensure_ascii=False)
-print("✅ Claude Code settings.json からhookを削除")
+print("✅ Hooks removed from Claude Code settings.json")
 PYEOF
 fi
 
 echo ""
-echo "✅ アンインストール完了"
-echo "   ログデータ (~/.daily-logs/raw/, *.md) は保持しています。"
-echo "   完全に削除する場合: rm -rf ~/.daily-logs"
+echo "✅ Uninstall complete"
+echo "   Log data (~/.daily-logs/raw/, *.md) has been preserved."
+echo "   To remove everything: rm -rf ~/.daily-logs"
