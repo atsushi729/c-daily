@@ -53,7 +53,7 @@ jobs:
 
       - name: Run install.sh (local)
         run: |
-          # CIではgit cloneをスキップしてローカルパスを直接使用
+          # In the GitHub Actions environment, we install c-daily to a local directory and add it to the PATH.
           INSTALL_DIR="${HOME}/.local/share/c-daily"
           BIN_DIR="${HOME}/.local/bin"
           mkdir -p "$INSTALL_DIR" "$BIN_DIR"
