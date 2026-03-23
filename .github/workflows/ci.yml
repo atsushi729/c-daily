@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: "."
+          severity: warning
+
+  install-smoke-test:
+    name: Install smoke test (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run install.sh (local)
+        run: |
+          # CIではgit cloneをスキップしてローカルパスを直接使用
+          INSTALL_DIR="${HOME}/.local/share/c-daily"
+          BIN_DIR="${HOME}/.local/bin"
+          mkdir -p "$INSTALL_DIR" "$BIN_DIR"
+          cp -r . "$INSTALL_DIR/"
+          ln -sf "$INSTALL_DIR/bin/c-daily" "$BIN_DIR/c-daily"
+          chmod +x "$INSTALL_DIR/bin/c-daily"
+          echo "$BIN_DIR" >> $GITHUB_PATH
+
+      - name: Smoke test — c-daily version
+        run: c-daily version
+
+      - name: Smoke test — c-daily help
+        run: c-daily help
+
+      - name: Smoke test — c-daily today (空ログ)
+        run: c-daily today

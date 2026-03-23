@@ -1,0 +1,7 @@
+{"timestamp":"2026-03-23T10:23:11","source":"claude-code","type":"file_edit","tool":"write_file","path":"src/auth/login.py","summary":"✏️ 編集: src/auth/login.py"}
+{"timestamp":"2026-03-23T10:31:05","source":"claude-code","type":"command","tool":"bash","command":"pytest tests/test_auth.py -v","summary":"⚡ 実行: pytest tests/test_auth.py -v"}
+{"timestamp":"2026-03-23T10:45:22","source":"claude-code","type":"file_edit","tool":"str_replace","path":"src/auth/login.py","summary":"✏️ 編集: src/auth/login.py"}
+{"timestamp":"2026-03-23T11:00:00","source":"claude-code","type":"session_summary","session_id":"sess_abc123","first_msg":"認証モジュールのリファクタリングを手伝ってほしい","turns":12,"cost_usd":0.0231,"summary":"💬 セッション終了: 認証モジュールのリファクタリングを手伝ってほしい"}
+{"timestamp":"2026-03-23T14:05:33","source":"git","type":"git","repo":"my-app","hash":"abc1234def","message":"feat: add JWT refresh token support","summary":"🌿 [my-app] feat: add JWT refresh token support"}
+{"timestamp":"2026-03-23T14:32:11","source":"claude-code","type":"file_edit","tool":"write_file","path":"tests/test_auth.py","summary":"✏️ 編集: tests/test_auth.py"}
+{"timestamp":"2026-03-23T17:42:00","source":"claude-code","type":"session_summary","session_id":"sess_def456","first_msg":"テストのリファクタリングをしたい","turns":8,"cost_usd":0.0148,"summary":"💬 セッション終了: テストのリファクタリングをしたい"}

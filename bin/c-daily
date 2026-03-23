@@ -1,0 +1,68 @@
+#!/bin/bash
+# c-daily — Claude Code daily log CLI
+set -euo pipefail
+
+C_DAILY_VERSION="0.1.0"
+C_DAILY_LIB="$(cd "$(dirname "$0")/../lib" && pwd)"
+C_DAILY_LOG_DIR="${C_DAILY_LOG_DIR:-${HOME}/.daily-logs}"
+
+_usage() {
+  cat <<EOF
+c-daily v${C_DAILY_VERSION} — Claude Code 日次ログ自動生成ツール
+
+Usage:
+  c-daily install            Claude Code hookとlaunchdを設定
+  c-daily today              今日のログを生成して開く
+  c-daily show [DATE]        指定日のログを生成して開く (例: 2026-03-22)
+  c-daily status             hookとlaunchdの動作状況を確認
+  c-daily raw [DATE]         生ログ(JSONL)をそのまま表示
+  c-daily uninstall          全設定を削除
+  c-daily version            バージョンを表示
+  c-daily help               このヘルプを表示
+
+環境変数:
+  C_DAILY_LOG_DIR   ログ保存先ディレクトリ (デフォルト: ~/.daily-logs)
+EOF
+}
+
+CMD="${1:-help}"
+shift || true
+
+case "$CMD" in
+  install)   bash "$C_DAILY_LIB/cmd/install.sh" "$@" ;;
+  today)
+    python3 "$C_DAILY_LIB/aggregate.py"
+    OUTFILE="${C_DAILY_LOG_DIR}/$(date +%Y-%m-%d).md"
+    if [ -f "$OUTFILE" ]; then
+      open "$OUTFILE" 2>/dev/null || xdg-open "$OUTFILE" 2>/dev/null || echo "📄 $OUTFILE"
+    fi
+    ;;
+  show)
+    DATE="${1:-$(date +%Y-%m-%d)}"
+    python3 "$C_DAILY_LIB/aggregate.py" "$DATE"
+    OUTFILE="${C_DAILY_LOG_DIR}/${DATE}.md"
+    if [ -f "$OUTFILE" ]; then
+      open "$OUTFILE" 2>/dev/null || xdg-open "$OUTFILE" 2>/dev/null || echo "📄 $OUTFILE"
+    fi
+    ;;
+  status)    bash "$C_DAILY_LIB/cmd/status.sh" ;;
+  raw)
+    DATE="${1:-$(date +%Y-%m-%d)}"
+    RAW="${C_DAILY_LOG_DIR}/raw/${DATE}.jsonl"
+    if [ -f "$RAW" ]; then
+      cat "$RAW"
+    else
+      echo "⚠️  ログファイルが見つかりません: $RAW"
+      exit 1
+    fi
+    ;;
+  uninstall) bash "$C_DAILY_LIB/cmd/uninstall.sh" ;;
+  version)   echo "c-daily v${C_DAILY_VERSION}" ;;
+  help|--help|-h) _usage ;;
+  *)
+    echo "❌ 不明なコマンド: $CMD"
+    echo ""
+    _usage
+    exit 1
+    ;;
+esac
