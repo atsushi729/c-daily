@@ -101,6 +101,45 @@ def build_md(target_date: str, records: list[dict]) -> str:
             lines.append(f"- `{t}` {msg}{meta_str}")
         lines.append("")
 
+    # --- Decision log ---
+    sessions_with_decisions = [r for r in by_type["session_summary"] if r.get("decision_summary")]
+    if sessions_with_decisions:
+        lines += ["## 🎯 Decision Log", ""]
+        for r in sessions_with_decisions:
+            t  = fmt_time(r.get("timestamp", ""))
+            ds = r["decision_summary"]
+            lines.append(f"### `{t}` Session")
+            if ds.get("problem"):
+                lines.append(f"**Problem:** {ds['problem']}")
+                lines.append("")
+            if ds.get("approaches"):
+                lines.append("**Approaches considered:**")
+                for ap in ds["approaches"]:
+                    lines.append(f"- {ap}")
+                lines.append("")
+            if ds.get("selected"):
+                lines.append(f"**Selected:** {ds['selected']}")
+            lines.append("")
+
+    # --- Project activity summary ---
+    project_edits: dict[str, list] = defaultdict(list)
+    for r in by_type["file_edit"]:
+        path = r.get("path", "")
+        # use top-level directory as the project name
+        parts = path.strip("/").split("/")
+        project = parts[1] if path.startswith("/") and len(parts) > 2 else (parts[0] if parts else "unknown")
+        project_edits[project].append(path)
+    if project_edits:
+        lines += ["## 📁 Project Activity", ""]
+        for project, paths in sorted(project_edits.items()):
+            unique_files = sorted(set(paths))
+            lines.append(f"**{project}** — {len(unique_files)} file(s) edited")
+            for p in unique_files[:10]:
+                lines.append(f"  - `{p}`")
+            if len(unique_files) > 10:
+                lines.append(f"  - _...and {len(unique_files) - 10} more_")
+            lines.append("")
+
     # --- Git commits ---
     if by_type["git"]:
         lines += ["## 🌿 Git Commits", ""]

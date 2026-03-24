@@ -63,6 +63,63 @@ record = {
 if cost_usd is not None:
     record["cost_usd"] = float(cost_usd)
 
+# Extract decision summary from transcript using claude CLI
+if transcript_path and os.path.exists(transcript_path):
+    try:
+        # Build plain text from transcript for summarization
+        messages = []
+        with open(transcript_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                role = entry.get("role") or entry.get("type", "")
+                if role not in ("user", "assistant"):
+                    continue
+                content = entry.get("content", "")
+                text = ""
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            text += block["text"]
+                elif isinstance(content, str):
+                    text = content
+                if text.strip():
+                    messages.append(f"[{role}]: {text[:500]}")
+        if messages:
+            transcript_text = "\n".join(messages[:40])  # limit to first 40 turns
+            prompt = (
+                "You are summarizing a Claude Code session transcript.\n"
+                "Extract the following 3 fields in JSON (respond with JSON only):\n"
+                "- problem: the main issue or task addressed (1-2 sentences)\n"
+                "- approaches: list of approaches or options considered (array, one sentence each)\n"
+                "- selected: the approach that was ultimately chosen (1 sentence)\n"
+                'Example: {"problem":"...", "approaches":["...","..."], "selected":"..."}\n\n'
+                f"Transcript:\n{transcript_text}"
+            )
+            import subprocess
+            result = subprocess.run(
+                ["claude", "-p", prompt, "--output-format", "text"],
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode == 0:
+                raw = result.stdout.strip()
+                # Extract JSON from response
+                import re
+                m = re.search(r'\{.*\}', raw, re.DOTALL)
+                if m:
+                    try:
+                        decision = json.loads(m.group())
+                        record["decision_summary"] = decision
+                    except json.JSONDecodeError:
+                        pass
+    except Exception:
+        pass
+
 with open(outfile, "a", encoding="utf-8") as f:
     f.write(json.dumps(record, ensure_ascii=False) + "\n")
 PYEOF
