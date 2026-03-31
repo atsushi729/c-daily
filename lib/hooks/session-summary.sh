@@ -1,5 +1,10 @@
 #!/bin/bash
 # Stop hook — appends a session summary record to today's raw log
+#
+# Fix: Use Anthropic API directly (curl) instead of `claude -p`.
+# Calling `claude -p` inside a Stop hook starts a new Claude Code session,
+# which fires another Stop hook when it finishes → infinite recursion.
+# A plain curl call to the API has no hook awareness, so it is safe.
 set -euo pipefail
 
 LOG_DIR="${C_DAILY_LOG_DIR:-${HOME}/.daily-logs}"
@@ -10,18 +15,19 @@ trap 'rm -f "$PAYLOAD_FILE"' EXIT
 cat > "$PAYLOAD_FILE"
 
 python3 - "$PAYLOAD_FILE" "$LOG_DIR" <<'PYEOF'
-import json, sys, os
+import json, sys, os, re, subprocess
 from datetime import datetime
 
 with open(sys.argv[1]) as f:
     payload = json.load(f)
 
-log_dir        = sys.argv[2]
-ts             = datetime.now().isoformat()
-today          = datetime.now().strftime("%Y-%m-%d")
-outfile        = os.path.join(log_dir, "raw", f"{today}.jsonl")
+log_dir         = sys.argv[2]
+ts              = datetime.now().isoformat()
+today           = datetime.now().strftime("%Y-%m-%d")
+outfile         = os.path.join(log_dir, "raw", f"{today}.jsonl")
 transcript_path = payload.get("transcript_path", "")
 
+# ── Step 1: extract basic metadata from transcript ────────────────────────────
 first_msg = ""
 turns     = 0
 cost_usd  = None
@@ -37,9 +43,10 @@ if transcript_path and os.path.exists(transcript_path):
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                role = entry.get("role") or entry.get("type", "")
+                role    = entry.get("type") or entry.get("role", "")
+                msg_obj = entry.get("message", {})
+                content = msg_obj.get("content", "") if msg_obj else entry.get("content", "")
                 if role == "user" and not first_msg:
-                    content = entry.get("content", "")
                     if isinstance(content, list):
                         for block in content:
                             if isinstance(block, dict) and block.get("type") == "text":
@@ -49,7 +56,10 @@ if transcript_path and os.path.exists(transcript_path):
                         first_msg = content[:100]
                 if role in ("assistant", "user"):
                     turns += 1
-                cost_usd = entry.get("costUSD") or entry.get("cost_usd") or cost_usd
+                cost_usd = (
+                    entry.get("costUSD") or entry.get("cost_usd")
+                    or (msg_obj or {}).get("costUSD") or cost_usd
+                )
     except Exception:
         pass
 
@@ -63,10 +73,17 @@ record = {
 if cost_usd is not None:
     record["cost_usd"] = float(cost_usd)
 
-# Extract decision summary from transcript using claude CLI
-if transcript_path and os.path.exists(transcript_path):
+# ── Step 2: call Anthropic API directly via curl (NOT `claude -p`) ────────────
+#
+# `claude -p` would start a new Claude Code process, which fires another
+# Stop hook on exit → infinite loop.  curl talks to the API endpoint
+# directly and has no hook awareness, so it is safe.
+#
+# Requires: ANTHROPIC_API_KEY environment variable
+api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+if api_key and transcript_path and os.path.exists(transcript_path):
     try:
-        # Build plain text from transcript for summarization
+        # Build a plain-text excerpt from the transcript (max 40 exchanges)
         messages = []
         with open(transcript_path, encoding="utf-8") as f:
             for line in f:
@@ -77,10 +94,11 @@ if transcript_path and os.path.exists(transcript_path):
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                role = entry.get("role") or entry.get("type", "")
+                role    = entry.get("type") or entry.get("role", "")
                 if role not in ("user", "assistant"):
                     continue
-                content = entry.get("content", "")
+                msg_obj = entry.get("message", {})
+                content = msg_obj.get("content", "") if msg_obj else entry.get("content", "")
                 text = ""
                 if isinstance(content, list):
                     for block in content:
@@ -90,36 +108,54 @@ if transcript_path and os.path.exists(transcript_path):
                     text = content
                 if text.strip():
                     messages.append(f"[{role}]: {text[:500]}")
+
         if messages:
-            transcript_text = "\n".join(messages[:40])  # limit to first 40 turns
+            transcript_text = "\n".join(messages[:40])
             prompt = (
                 "You are summarizing a Claude Code session transcript.\n"
-                "Extract the following 3 fields in JSON (respond with JSON only):\n"
+                "Extract the following fields in JSON (respond with JSON only, no markdown):\n"
                 "- problem: the main issue or task addressed (1-2 sentences)\n"
                 "- approaches: list of approaches or options considered (array, one sentence each)\n"
                 "- selected: the approach that was ultimately chosen (1 sentence)\n"
-                'Example: {"problem":"...", "approaches":["...","..."], "selected":"..."}\n\n'
+                'Example: {"problem":"...","approaches":["...","..."],"selected":"..."}\n\n'
                 f"Transcript:\n{transcript_text}"
             )
-            import subprocess
+
+            # Build the JSON body for the API request
+            api_body = json.dumps({
+                "model": "claude-haiku-4-5-20251001",  # fast & cheap for summarization
+                "max_tokens": 512,
+                "messages": [{"role": "user", "content": prompt}],
+            })
+
             result = subprocess.run(
-                ["claude", "-p", prompt, "--output-format", "text"],
-                capture_output=True, text=True, timeout=30
+                [
+                    "curl", "-fsSL",
+                    "https://api.anthropic.com/v1/messages",
+                    "-H", "Content-Type: application/json",
+                    "-H", f"x-api-key: {api_key}",
+                    "-H", "anthropic-version: 2023-06-01",
+                    "-d", api_body,
+                ],
+                capture_output=True, text=True, timeout=30,
             )
+
             if result.returncode == 0:
-                raw = result.stdout.strip()
-                # Extract JSON from response
-                import re
-                m = re.search(r'\{.*\}', raw, re.DOTALL)
+                resp = json.loads(result.stdout)
+                raw_text = ""
+                for block in resp.get("content", []):
+                    if block.get("type") == "text":
+                        raw_text += block["text"]
+                m = re.search(r'\{.*\}', raw_text, re.DOTALL)
                 if m:
                     try:
-                        decision = json.loads(m.group())
-                        record["decision_summary"] = decision
+                        record["decision_summary"] = json.loads(m.group())
                     except json.JSONDecodeError:
                         pass
     except Exception:
-        pass
+        pass  # decision_summary is optional; never block the main write
 
+# ── Step 3: write the record ──────────────────────────────────────────────────
 with open(outfile, "a", encoding="utf-8") as f:
     f.write(json.dumps(record, ensure_ascii=False) + "\n")
 PYEOF
