@@ -1,16 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env python3
 # c-daily — Claude Code daily log CLI
-set -euo pipefail
+import os
+import platform
+import subprocess
+import sys
+from datetime import date
+from pathlib import Path
 
-C_DAILY_VERSION="0.1.0"
-_SCRIPT="$(readlink "$0" 2>/dev/null || echo "$0")"
-[[ "$_SCRIPT" != /* ]] && _SCRIPT="$(cd "$(dirname "$0")" && pwd)/$_SCRIPT"
-C_DAILY_LIB="$(cd "$(dirname "$_SCRIPT")/../lib" && pwd)"
-C_DAILY_LOG_DIR="${C_DAILY_LOG_DIR:-${HOME}/.daily-logs}"
+VERSION = "0.1.0"
 
-_usage() {
-  cat <<EOF
-c-daily v${C_DAILY_VERSION} — Claude Code daily log auto-generator
+_SCRIPT = Path(__file__).resolve()
+C_DAILY_LIB = _SCRIPT.parent.parent / "lib"
+C_DAILY_LOG_DIR = Path(os.environ.get("C_DAILY_LOG_DIR", Path.home() / ".daily-logs"))
+
+
+def usage() -> None:
+    print(f"""c-daily v{VERSION} — Claude Code daily log auto-generator
 
 Usage:
   c-daily install            Set up Claude Code hooks and launchd
@@ -24,47 +29,80 @@ Usage:
 
 Environment variables:
   C_DAILY_LOG_DIR   Log storage directory (default: ~/.daily-logs)
-EOF
-}
+""")
 
-CMD="${1:-help}"
-shift || true
 
-case "$CMD" in
-  install)   bash "$C_DAILY_LIB/cmd/install.sh" "$@" ;;
-  today)
-    python3 "$C_DAILY_LIB/aggregate.py"
-    OUTFILE="${C_DAILY_LOG_DIR}/$(date +%Y-%m-%d).md"
-    if [ -f "$OUTFILE" ]; then
-      open "$OUTFILE" 2>/dev/null || xdg-open "$OUTFILE" 2>/dev/null || echo "📄 $OUTFILE"
-    fi
-    ;;
-  show)
-    DATE="${1:-$(date +%Y-%m-%d)}"
-    python3 "$C_DAILY_LIB/aggregate.py" "$DATE"
-    OUTFILE="${C_DAILY_LOG_DIR}/${DATE}.md"
-    if [ -f "$OUTFILE" ]; then
-      open "$OUTFILE" 2>/dev/null || xdg-open "$OUTFILE" 2>/dev/null || echo "📄 $OUTFILE"
-    fi
-    ;;
-  status)    bash "$C_DAILY_LIB/cmd/status.sh" ;;
-  raw)
-    DATE="${1:-$(date +%Y-%m-%d)}"
-    RAW="${C_DAILY_LOG_DIR}/raw/${DATE}.jsonl"
-    if [ -f "$RAW" ]; then
-      cat "$RAW"
-    else
-      echo "⚠️  Log file not found: $RAW"
-      exit 1
-    fi
-    ;;
-  uninstall) bash "$C_DAILY_LIB/cmd/uninstall.sh" ;;
-  version)   echo "c-daily v${C_DAILY_VERSION}" ;;
-  help|--help|-h) _usage ;;
-  *)
-    echo "❌ Unknown command: $CMD"
-    echo ""
-    _usage
-    exit 1
-    ;;
-esac
+def open_file(path: Path) -> None:
+    if platform.system() == "Darwin":
+        subprocess.run(["open", str(path)], check=False)
+    else:
+        subprocess.run(["xdg-open", str(path)], check=False)
+
+
+def _run_module(name: str) -> None:
+    """Import and run a subcommand module from lib/cmd/."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name, C_DAILY_LIB / "cmd" / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    mod.run(C_DAILY_LIB, C_DAILY_LOG_DIR)
+
+
+def main() -> None:
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
+    args = sys.argv[2:]
+
+    if cmd == "install":
+        _run_module("install")
+
+    elif cmd == "today":
+        subprocess.run([sys.executable, str(C_DAILY_LIB / "aggregate.py")], check=True)
+        outfile = C_DAILY_LOG_DIR / f"{date.today()}.md"
+        if outfile.exists():
+            open_file(outfile)
+
+    elif cmd == "show":
+        target_date = args[0] if args else str(date.today())
+        subprocess.run([sys.executable, str(C_DAILY_LIB / "aggregate.py"), target_date], check=True)
+        outfile = C_DAILY_LOG_DIR / f"{target_date}.md"
+        if outfile.exists():
+            open_file(outfile)
+
+    elif cmd == "status":
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("status", C_DAILY_LIB / "cmd" / "status.py")
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        mod.run(C_DAILY_LOG_DIR)
+
+    elif cmd == "raw":
+        target_date = args[0] if args else str(date.today())
+        raw_file = C_DAILY_LOG_DIR / "raw" / f"{target_date}.jsonl"
+        if raw_file.exists():
+            print(raw_file.read_text(encoding="utf-8"), end="")
+        else:
+            print(f"⚠️  Log file not found: {raw_file}", file=sys.stderr)
+            sys.exit(1)
+
+    elif cmd == "uninstall":
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("uninstall", C_DAILY_LIB / "cmd" / "uninstall.py")
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        mod.run(C_DAILY_LOG_DIR)
+
+    elif cmd == "version":
+        print(f"c-daily v{VERSION}")
+
+    elif cmd in ("help", "--help", "-h"):
+        usage()
+
+    else:
+        print(f"❌ Unknown command: {cmd}", file=sys.stderr)
+        print()
+        usage()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

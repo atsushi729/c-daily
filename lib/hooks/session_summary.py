@@ -1,36 +1,34 @@
-#!/bin/bash
+#!/usr/bin/env python3
 # Stop hook — appends a session summary record to today's raw log
 #
-# Fix: Use Anthropic API directly (curl) instead of `claude -p`.
+# Fix: Use Anthropic API directly (urllib) instead of `claude -p`.
 # Calling `claude -p` inside a Stop hook starts a new Claude Code session,
 # which fires another Stop hook when it finishes → infinite recursion.
-# A plain curl call to the API has no hook awareness, so it is safe.
-set -euo pipefail
-
-LOG_DIR="${C_DAILY_LOG_DIR:-${HOME}/.daily-logs}"
-mkdir -p "${LOG_DIR}/raw"
-
-PAYLOAD_FILE=$(mktemp)
-trap 'rm -f "$PAYLOAD_FILE"' EXIT
-cat > "$PAYLOAD_FILE"
-
-python3 - "$PAYLOAD_FILE" "$LOG_DIR" <<'PYEOF'
-import json, sys, os, re, subprocess
+# A plain HTTP call to the API has no hook awareness, so it is safe.
+import json
+import os
+import re
+import subprocess
+import sys
 from datetime import datetime
+from pathlib import Path
 
-with open(sys.argv[1]) as f:
-    payload = json.load(f)
+LOG_DIR = Path(os.environ.get("C_DAILY_LOG_DIR", Path.home() / ".daily-logs"))
+LOG_DIR_RAW = LOG_DIR / "raw"
+LOG_DIR_RAW.mkdir(parents=True, exist_ok=True)
 
-log_dir         = sys.argv[2]
-ts              = datetime.now().isoformat()
-today           = datetime.now().strftime("%Y-%m-%d")
-outfile         = os.path.join(log_dir, "raw", f"{today}.jsonl")
+payload = json.load(sys.stdin)
+
+ts = datetime.now().isoformat()
+today = datetime.now().strftime("%Y-%m-%d")
+outfile = LOG_DIR_RAW / f"{today}.jsonl"
 transcript_path = payload.get("transcript_path", "")
 
-# ── Step 1: extract basic metadata from transcript ────────────────────────────
+# ── Step 1: extract metadata from transcript ──────────────────────────────────
 first_msg = ""
-turns     = 0
-cost_usd  = None
+turns = 0
+cost_usd = None
+total_tokens = 0
 
 if transcript_path and os.path.exists(transcript_path):
     try:
@@ -43,9 +41,10 @@ if transcript_path and os.path.exists(transcript_path):
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                role    = entry.get("type") or entry.get("role", "")
+                role = entry.get("type") or entry.get("role", "")
                 msg_obj = entry.get("message", {})
                 content = msg_obj.get("content", "") if msg_obj else entry.get("content", "")
+
                 if role == "user" and not first_msg:
                     if isinstance(content, list):
                         for block in content:
@@ -54,36 +53,61 @@ if transcript_path and os.path.exists(transcript_path):
                                 break
                     elif isinstance(content, str):
                         first_msg = content[:100]
+
                 if role in ("assistant", "user"):
                     turns += 1
+
                 cost_usd = (
                     entry.get("costUSD") or entry.get("cost_usd")
                     or (msg_obj or {}).get("costUSD") or cost_usd
                 )
+
+                if role == "assistant":
+                    usage = (msg_obj or {}).get("usage") or entry.get("usage") or {}
+                    if isinstance(usage, dict):
+                        total_tokens += (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
+
     except Exception:
         pass
 
+# ── Step 2: extract project name from transcript path ────────────────────────
+# transcript_path: ~/.claude/projects/{encoded_path}/{session}.jsonl
+# encoded_path: absolute project path with / replaced by -
+# e.g. -Users-name-Desktop-c-daily → project name: c-daily
+project_name = "unknown"
+if transcript_path:
+    dir_name = os.path.basename(os.path.dirname(transcript_path))
+    parts = dir_name.split("-")
+    skip_dirs = {"Desktop", "Documents", "Downloads", "home", "projects",
+                 "workspace", "src", "code", "dev", "work"}
+    project_parts = parts[3:] if len(parts) > 3 else parts
+    while project_parts and project_parts[0] in skip_dirs:
+        project_parts = project_parts[1:]
+    if project_parts:
+        project_name = "-".join(project_parts)
+
 record = {
-    "type":      "session_summary",
+    "type": "session_summary",
     "timestamp": ts,
+    "project_name": project_name,
     "first_msg": first_msg or "(no message)",
-    "turns":     turns // 2,
-    "summary":   f"Session: {(first_msg or '(no message)')[:60]}",
+    "turns": turns // 2,
+    "total_tokens": total_tokens,
+    "summary": f"Session: {(first_msg or '(no message)')[:60]}",
 }
 if cost_usd is not None:
     record["cost_usd"] = float(cost_usd)
 
-# ── Step 2: call Anthropic API directly via curl (NOT `claude -p`) ────────────
+# ── Step 3: call Anthropic API directly (NOT `claude -p`) ────────────────────
 #
 # `claude -p` would start a new Claude Code process, which fires another
-# Stop hook on exit → infinite loop.  curl talks to the API endpoint
-# directly and has no hook awareness, so it is safe.
+# Stop hook on exit → infinite loop.  Direct HTTP call to the API has no
+# hook awareness, so it is safe.
 #
 # Requires: ANTHROPIC_API_KEY environment variable
 api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 if api_key and transcript_path and os.path.exists(transcript_path):
     try:
-        # Build a plain-text excerpt from the transcript (max 40 exchanges)
         messages = []
         with open(transcript_path, encoding="utf-8") as f:
             for line in f:
@@ -94,7 +118,7 @@ if api_key and transcript_path and os.path.exists(transcript_path):
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                role    = entry.get("type") or entry.get("role", "")
+                role = entry.get("type") or entry.get("role", "")
                 if role not in ("user", "assistant"):
                     continue
                 msg_obj = entry.get("message", {})
@@ -121,9 +145,8 @@ if api_key and transcript_path and os.path.exists(transcript_path):
                 f"Transcript:\n{transcript_text}"
             )
 
-            # Build the JSON body for the API request
             api_body = json.dumps({
-                "model": "claude-haiku-4-5-20251001",  # fast & cheap for summarization
+                "model": "claude-haiku-4-5-20251001",
                 "max_tokens": 512,
                 "messages": [{"role": "user", "content": prompt}],
             })
@@ -155,7 +178,6 @@ if api_key and transcript_path and os.path.exists(transcript_path):
     except Exception:
         pass  # decision_summary is optional; never block the main write
 
-# ── Step 3: write the record ──────────────────────────────────────────────────
+# ── Step 4: write the record ──────────────────────────────────────────────────
 with open(outfile, "a", encoding="utf-8") as f:
     f.write(json.dumps(record, ensure_ascii=False) + "\n")
-PYEOF
