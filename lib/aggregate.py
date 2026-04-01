@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-c-daily aggregate.py
-JSONL raw log → daily Markdown generator
+aggregate.py — JSONL raw log → daily Markdown generator.
 """
-import sys
 import os
-from datetime import datetime, date
+import sys
+from datetime import date, datetime
 from pathlib import Path
 
-# Add lib directory to path so session_reader is importable
+# Ensure lib/ is importable regardless of working directory
 _LIB_DIR = Path(__file__).resolve().parent
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from session_reader import load_jsonl, compute_project_stats  # noqa: E402
+from constants import DEFAULT_LOG_DIR  # noqa: E402
+from session_reader import compute_project_stats, load_jsonl  # noqa: E402
 
-LOG_BASE = Path(os.environ.get("C_DAILY_LOG_DIR", Path.home() / ".daily-logs"))
-RAW_DIR  = LOG_BASE / "raw"
+LOG_BASE = Path(os.environ.get("C_DAILY_LOG_DIR", DEFAULT_LOG_DIR))
+RAW_DIR = LOG_BASE / "raw"
 
 
 def fmt_time(ts: str) -> str:
@@ -42,7 +42,7 @@ def build_md(target_date: str, records: list[dict]) -> str:
         return "\n".join(lines)
 
     sessions_sorted = sorted(sessions, key=lambda r: r.get("timestamp", ""))
-    total_cost   = sum(r.get("cost_usd", 0) or 0 for r in sessions)
+    total_cost = sum(r.get("cost_usd", 0) or 0 for r in sessions)
     total_tokens = sum(r.get("total_tokens", 0) or 0 for r in sessions)
 
     # ── Summary ───────────────────────────────────────────────────────────────
@@ -63,10 +63,10 @@ def build_md(target_date: str, records: list[dict]) -> str:
         "|------|---------|---------|--------|",
     ]
     for r in sessions_sorted:
-        t       = fmt_time(r.get("timestamp", ""))
+        t = fmt_time(r.get("timestamp", ""))
         project = r.get("project_name", "—")
-        msg     = r.get("first_msg", "—")
-        tokens  = fmt_tokens(r.get("total_tokens"))
+        msg = r.get("first_msg", "—")
+        tokens = fmt_tokens(r.get("total_tokens"))
         lines.append(f"| {t} | {project} | {msg} | {tokens} |")
     lines.append("")
 
@@ -75,9 +75,9 @@ def build_md(target_date: str, records: list[dict]) -> str:
     if sessions_with_decisions:
         lines += ["## Decision Log", ""]
         for r in sessions_with_decisions:
-            t       = fmt_time(r.get("timestamp", ""))
+            t = fmt_time(r.get("timestamp", ""))
             project = r.get("project_name", "")
-            header  = f"### {t}"
+            header = f"### {t}"
             if project and project != "unknown":
                 header += f" — {project}"
             lines.append(header)

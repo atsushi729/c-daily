@@ -37,10 +37,9 @@ _LIB_DIR = Path(__file__).resolve().parent
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
+from constants import CLAUDE_PROJECTS_DIR  # noqa: E402
+from models import MessageRecord, SessionMeta  # noqa: E402
 from session_reader import (  # noqa: E402
-    CLAUDE_PROJECTS_DIR,
-    MessageRecord,
-    SessionMeta,
     display_width,
     load_session_messages,
     load_sessions,

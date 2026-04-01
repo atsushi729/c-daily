@@ -7,11 +7,15 @@ import sys
 from datetime import date
 from pathlib import Path
 
-VERSION = "0.1.0"
-
 _SCRIPT = Path(__file__).resolve()
 C_DAILY_LIB = _SCRIPT.parent.parent / "lib"
 C_DAILY_LOG_DIR = Path(os.environ.get("C_DAILY_LOG_DIR", Path.home() / ".daily-logs"))
+
+# Make lib/ importable so constants and other modules can be imported directly
+if str(C_DAILY_LIB) not in sys.path:
+    sys.path.insert(0, str(C_DAILY_LIB))
+
+from constants import VERSION  # noqa: E402
 
 
 def usage() -> None:

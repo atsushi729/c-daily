@@ -7,19 +7,42 @@ Provides fast metadata loading and lazy full-message loading.
 from __future__ import annotations
 
 import json
+import sys
 import unicodedata
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
+# Ensure lib/ is importable regardless of working directory
+_LIB_DIR = Path(__file__).resolve().parent
+if str(_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(_LIB_DIR))
 
-# Common path segments to skip when decoding project name from directory
-_SKIP_SEGMENTS = {
-    "desktop", "documents", "downloads", "src", "work", "projects",
-    "home", "users", "code", "dev", "repos", "github", "workspace",
-}
+from constants import (  # noqa: E402
+    CLAUDE_PROJECTS_DIR,
+    FIRST_MSG_PREVIEW_LEN,
+    INPUT_COST_PER_TOKEN,
+    OUTPUT_COST_PER_TOKEN,
+    SKIP_PATH_SEGMENTS,
+    TOOL_INPUT_PREVIEW_LEN,
+    TOOL_RESULT_PREVIEW_LEN,
+)
+from models import MessageRecord, SessionMeta  # noqa: E402
+
+# Re-export for consumers that import these names from session_reader
+__all__ = [
+    "CLAUDE_PROJECTS_DIR",
+    "MessageRecord",
+    "SessionMeta",
+    "compute_project_stats",
+    "decode_project_name",
+    "display_width",
+    "load_jsonl",
+    "load_session_messages",
+    "load_session_meta",
+    "load_sessions",
+    "truncate_to_width",
+]
 
 
 def decode_project_name(encoded: str) -> str:
@@ -27,7 +50,7 @@ def decode_project_name(encoded: str) -> str:
     parts = [p for p in encoded.split("-") if p]
     meaningful: list[str] = []
     for part in reversed(parts):
-        if part.lower() in _SKIP_SEGMENTS:
+        if part.lower() in SKIP_PATH_SEGMENTS:
             break
         meaningful.append(part)
     if meaningful:
@@ -84,8 +107,8 @@ def _extract_text(content, plain_only: bool = False) -> str:
                     name = block.get("name", "tool")
                     inp = block.get("input", {})
                     inp_str = json.dumps(inp, ensure_ascii=False)
-                    if len(inp_str) > 150:
-                        inp_str = inp_str[:150] + "..."
+                    if len(inp_str) > TOOL_INPUT_PREVIEW_LEN:
+                        inp_str = inp_str[:TOOL_INPUT_PREVIEW_LEN] + "..."
                     parts.append(f"[Tool: {name}] {inp_str}")
                 elif btype == "tool_result":
                     inner = block.get("content", "")
@@ -94,52 +117,12 @@ def _extract_text(content, plain_only: bool = False) -> str:
                             if isinstance(item, dict) and item.get("type") == "text":
                                 t = item.get("text", "").strip()
                                 if t:
-                                    parts.append(f"[Result] {t[:300]}")
+                                    parts.append(f"[Result] {t[:TOOL_RESULT_PREVIEW_LEN]}")
                     elif isinstance(inner, str) and inner.strip():
-                        parts.append(f"[Result] {inner[:300]}")
+                        parts.append(f"[Result] {inner[:TOOL_RESULT_PREVIEW_LEN]}")
         sep = " " if plain_only else "\n"
         return sep.join(parts)
     return str(content).strip()
-
-
-@dataclass
-class MessageRecord:
-    role: str      # "user" or "assistant"
-    content: str   # rendered text
-    timestamp: str
-
-
-@dataclass
-class SessionMeta:
-    session_id: str
-    project_dir: str       # raw encoded directory name
-    project_name: str      # decoded human-readable name
-    file_path: Path
-    first_msg: str         # first user message preview (≤100 chars)
-    turns: int             # number of user messages
-    total_tokens: int
-    cost_usd: float
-    start_time: Optional[datetime]
-    messages: list[MessageRecord] = field(default_factory=list)
-    messages_loaded: bool = False
-
-    def fmt_start(self) -> str:
-        """Return local start time as HH:MM string."""
-        if not self.start_time:
-            return "--:--"
-        local = self.start_time
-        if local.tzinfo:
-            local = local.astimezone().replace(tzinfo=None)
-        return local.strftime("%H:%M")
-
-    def fmt_date(self) -> str:
-        """Return local start date as YYYY-MM-DD."""
-        if not self.start_time:
-            return "----"
-        local = self.start_time
-        if local.tzinfo:
-            local = local.astimezone().replace(tzinfo=None)
-        return local.strftime("%Y-%m-%d")
 
 
 def load_jsonl(path: Path) -> list[dict]:
@@ -193,7 +176,7 @@ def _build_session_meta(
             if not first_msg:
                 text = _extract_text(msg.get("content", ""), plain_only=True)
                 if text:
-                    first_msg = text[:100]
+                    first_msg = text[:FIRST_MSG_PREVIEW_LEN]
 
         elif rec_type == "assistant":
             msg = rec.get("message", {})
@@ -205,8 +188,10 @@ def _build_session_meta(
                 total_output += usage.get("output_tokens", 0) or 0
 
     total_tokens = total_input + total_output
-    # Approximate cost for Claude Sonnet 4.6: $3/MTok in, $15/MTok out
-    cost_usd = (total_input * 3.0 + total_output * 15.0) / 1_000_000
+    cost_usd = (
+        total_input * INPUT_COST_PER_TOKEN
+        + total_output * OUTPUT_COST_PER_TOKEN
+    )
 
     start_time = None
     if timestamps:

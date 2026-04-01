@@ -8,10 +8,21 @@ import subprocess
 import sys
 from pathlib import Path
 
+_LIB_DIR = Path(__file__).resolve().parent.parent  # lib/cmd/ → lib/
+if str(_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(_LIB_DIR))
+
+from constants import (  # noqa: E402
+    CLAUDE_SETTINGS_FILE,
+    LAUNCHD_HOUR,
+    LAUNCHD_LABEL,
+    LAUNCHD_MINUTE,
+    LAUNCHD_PLIST_PATH,
+    MIN_PYTHON_VERSION,
+)
+
 
 def run(lib_dir: Path, log_dir: Path) -> None:
-    claude_settings = Path.home() / ".claude" / "settings.json"
-
     print("Starting c-daily setup...")
     print()
 
@@ -24,8 +35,11 @@ def run(lib_dir: Path, log_dir: Path) -> None:
         sys.exit(1)
 
     version_info = sys.version_info
-    if version_info < (3, 9):
-        print(f"❌ Python 3.9 or higher required (current: {version_info.major}.{version_info.minor})")
+    if version_info < MIN_PYTHON_VERSION:
+        print(
+            f"❌ Python {MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]} or higher required"
+            f" (current: {version_info.major}.{version_info.minor})"
+        )
         sys.exit(1)
     print(f"✅ Python {version_info.major}.{version_info.minor}")
 
@@ -44,7 +58,7 @@ def run(lib_dir: Path, log_dir: Path) -> None:
     print("✅ Hook scripts copied")
 
     # --- Add hooks to Claude Code settings.json ---
-    Path.home().joinpath(".claude").mkdir(exist_ok=True)
+    CLAUDE_SETTINGS_FILE.parent.mkdir(exist_ok=True)
 
     hook_snippet = {
         "hooks": {
@@ -61,12 +75,12 @@ def run(lib_dir: Path, log_dir: Path) -> None:
         }
     }
 
-    if not claude_settings.exists():
-        with open(claude_settings, "w", encoding="utf-8") as f:
+    if not CLAUDE_SETTINGS_FILE.exists():
+        with open(CLAUDE_SETTINGS_FILE, "w", encoding="utf-8") as f:
             json.dump(hook_snippet, f, indent=2, ensure_ascii=False)
         print("✅ Claude Code settings.json created")
     else:
-        with open(claude_settings, encoding="utf-8") as f:
+        with open(CLAUDE_SETTINGS_FILE, encoding="utf-8") as f:
             existing = json.load(f)
         if "hooks" in existing:
             print("⚠️  ~/.claude/settings.json already has a 'hooks' key.")
@@ -76,13 +90,12 @@ def run(lib_dir: Path, log_dir: Path) -> None:
             print()
         else:
             existing.update(hook_snippet)
-            with open(claude_settings, "w", encoding="utf-8") as f:
+            with open(CLAUDE_SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(existing, f, indent=2, ensure_ascii=False)
             print("✅ Hooks added to Claude Code settings.json")
 
     # --- Register launchd (macOS only) ---
     if platform.system() == "Darwin":
-        plist_dst = Path.home() / "Library" / "LaunchAgents" / "com.c-daily.aggregate.plist"
         python_path = shutil.which("python3") or sys.executable
         username = os.environ.get("USER", Path.home().name)
 
@@ -92,7 +105,7 @@ def run(lib_dir: Path, log_dir: Path) -> None:
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.c-daily.aggregate</string>
+    <string>{LAUNCHD_LABEL}</string>
     <key>ProgramArguments</key>
     <array>
         <string>{python_path}</string>
@@ -100,8 +113,8 @@ def run(lib_dir: Path, log_dir: Path) -> None:
     </array>
     <key>StartCalendarInterval</key>
     <dict>
-        <key>Hour</key><integer>23</integer>
-        <key>Minute</key><integer>58</integer>
+        <key>Hour</key><integer>{LAUNCHD_HOUR}</integer>
+        <key>Minute</key><integer>{LAUNCHD_MINUTE}</integer>
     </dict>
     <key>StandardOutPath</key>
     <string>/Users/{username}/.daily-logs/launchd.log</string>
@@ -110,10 +123,10 @@ def run(lib_dir: Path, log_dir: Path) -> None:
 </dict>
 </plist>
 """
-        plist_dst.write_text(plist_content, encoding="utf-8")
-        subprocess.run(["launchctl", "unload", str(plist_dst)], capture_output=True)
-        subprocess.run(["launchctl", "load", str(plist_dst)], check=True)
-        print("✅ launchd registered (auto-run daily at 23:58)")
+        LAUNCHD_PLIST_PATH.write_text(plist_content, encoding="utf-8")
+        subprocess.run(["launchctl", "unload", str(LAUNCHD_PLIST_PATH)], capture_output=True)
+        subprocess.run(["launchctl", "load", str(LAUNCHD_PLIST_PATH)], check=True)
+        print(f"✅ launchd registered (auto-run daily at {LAUNCHD_HOUR:02d}:{LAUNCHD_MINUTE:02d})")
 
     # --- Done ---
     print()
