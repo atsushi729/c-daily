@@ -123,6 +123,11 @@ def build_md(target_date: str, records: list[dict]) -> str:
 
 def main() -> None:
     target = sys.argv[1] if len(sys.argv) > 1 else date.today().isoformat()
+    try:
+        datetime.strptime(target, "%Y-%m-%d")
+    except ValueError:
+        print(f"❌ Invalid date format: {target!r}. Expected YYYY-MM-DD.", file=sys.stderr)
+        sys.exit(1)
     records = load_jsonl(RAW_DIR / f"{target}.jsonl")
     out = LOG_BASE / f"{target}.md"
     LOG_BASE.mkdir(parents=True, exist_ok=True)

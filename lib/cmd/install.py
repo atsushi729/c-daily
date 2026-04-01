@@ -53,7 +53,7 @@ def run(lib_dir: Path, log_dir: Path) -> None:
     hook_src = lib_dir / "hooks" / "session_summary.py"
     hook_dst = hooks_dir / "session_summary.py"
     shutil.copy2(hook_src, hook_dst)
-    hook_dst.chmod(0o755)
+    hook_dst.chmod(0o700)
     shutil.copy2(lib_dir / "aggregate.py", log_dir / "scripts" / "aggregate.py")
     print("✅ Hook scripts copied")
 
@@ -97,7 +97,7 @@ def run(lib_dir: Path, log_dir: Path) -> None:
     # --- Register launchd (macOS only) ---
     if platform.system() == "Darwin":
         python_path = shutil.which("python3") or sys.executable
-        username = os.environ.get("USER", Path.home().name)
+        home_dir = Path.home()
 
         plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -109,7 +109,7 @@ def run(lib_dir: Path, log_dir: Path) -> None:
     <key>ProgramArguments</key>
     <array>
         <string>{python_path}</string>
-        <string>/Users/{username}/.daily-logs/scripts/aggregate.py</string>
+        <string>{home_dir}/.daily-logs/scripts/aggregate.py</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>
@@ -117,9 +117,9 @@ def run(lib_dir: Path, log_dir: Path) -> None:
         <key>Minute</key><integer>{LAUNCHD_MINUTE}</integer>
     </dict>
     <key>StandardOutPath</key>
-    <string>/Users/{username}/.daily-logs/launchd.log</string>
+    <string>{home_dir}/.daily-logs/launchd.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/{username}/.daily-logs/launchd-error.log</string>
+    <string>{home_dir}/.daily-logs/launchd-error.log</string>
 </dict>
 </plist>
 """

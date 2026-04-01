@@ -58,9 +58,11 @@ case "${SHELL:-}" in
 esac
 
 if [ -n "$SHELL_RC" ] && ! echo "$PATH" | grep -q "$BIN_DIR"; then
-  echo "" >> "$SHELL_RC"
-  echo "# c-daily" >> "$SHELL_RC"
-  echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$SHELL_RC"
+  {
+    echo ""
+    echo "# c-daily"
+    printf 'export PATH="%s:$PATH"\n' "$BIN_DIR"
+  } >> "$SHELL_RC"
   warn "Added PATH to $SHELL_RC. To apply now:"
   echo "  source $SHELL_RC"
 fi

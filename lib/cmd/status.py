@@ -18,6 +18,8 @@ from constants import (  # noqa: E402
     LAUNCHD_MINUTE,
 )
 
+_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
 
 def run(log_dir: Path) -> None:
     today = date.today().isoformat()
@@ -26,8 +28,18 @@ def run(log_dir: Path) -> None:
     print("📊 c-daily status")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    # Check Claude Code hook
-    if CLAUDE_SETTINGS_FILE.exists() and "session_summary.py" in CLAUDE_SETTINGS_FILE.read_text():
+    # Check Claude Code hook — single stat() call avoids TOCTOU
+    try:
+        settings_text = (
+            CLAUDE_SETTINGS_FILE.read_text()
+            if CLAUDE_SETTINGS_FILE.stat().st_size <= _MAX_FILE_SIZE
+            else ""
+        )
+        hook_configured = "session_summary.py" in settings_text
+    except OSError:
+        hook_configured = False
+
+    if hook_configured:
         print("✅ Claude Code hook  : configured")
     else:
         print("❌ Claude Code hook  : not configured (run c-daily install)")
@@ -42,11 +54,15 @@ def run(log_dir: Path) -> None:
         else:
             print("❌ launchd           : not registered (run c-daily install)")
 
-    # Check today's log
-    if raw_file.exists():
-        count = sum(1 for line in raw_file.read_text().splitlines() if line.strip())
-        print(f"✅ Today's raw log   : {count} records ({raw_file})")
-    else:
+    # Check today's log — single stat() call avoids TOCTOU
+    try:
+        raw_size = raw_file.stat().st_size
+        if raw_size > _MAX_FILE_SIZE:
+            print(f"✅ Today's raw log   : (file too large to count) ({raw_file})")
+        else:
+            count = sum(1 for line in raw_file.read_text().splitlines() if line.strip())
+            print(f"✅ Today's raw log   : {count} records ({raw_file})")
+    except OSError:
         print("⚠️  Today's raw log   : none yet (will be recorded when you use Claude Code)")
 
     # Log directory

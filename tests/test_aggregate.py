@@ -151,9 +151,11 @@ class TestLoadJsonl:
             f.write(json.dumps(SESSION_A) + "\n")
             f.write(json.dumps(SESSION_B) + "\n")
             path = Path(f.name)
-        records = load_jsonl(path)
-        assert len(records) == 2
-        path.unlink()
+        try:
+            records = load_jsonl(path)
+            assert len(records) == 2
+        finally:
+            path.unlink(missing_ok=True)
 
     def test_missing_file_returns_empty(self):
         records = load_jsonl(Path("/nonexistent/path.jsonl"))
@@ -165,9 +167,11 @@ class TestLoadJsonl:
             f.write("THIS IS NOT JSON\n")
             f.write(json.dumps(SESSION_B) + "\n")
             path = Path(f.name)
-        records = load_jsonl(path)
-        assert len(records) == 2
-        path.unlink()
+        try:
+            records = load_jsonl(path)
+            assert len(records) == 2
+        finally:
+            path.unlink(missing_ok=True)
 
     def test_skips_empty_lines(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
@@ -175,6 +179,8 @@ class TestLoadJsonl:
             f.write(json.dumps(SESSION_A) + "\n")
             f.write("   \n")
             path = Path(f.name)
-        records = load_jsonl(path)
-        assert len(records) == 1
-        path.unlink()
+        try:
+            records = load_jsonl(path)
+            assert len(records) == 1
+        finally:
+            path.unlink(missing_ok=True)

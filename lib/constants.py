@@ -6,6 +6,8 @@ from more than one module belong here.
 """
 from __future__ import annotations
 
+import sys
+from datetime import datetime
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -71,3 +73,12 @@ TOOL_RESULT_PREVIEW_LEN = 300  # max chars for inline tool result display
 # Minimum supported Python version
 # ---------------------------------------------------------------------------
 MIN_PYTHON_VERSION = (3, 9)
+
+
+def validate_date(value: str) -> None:
+    """Exit with an error message if value is not a valid YYYY-MM-DD date."""
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        print(f"❌ Invalid date format: {value!r}. Expected YYYY-MM-DD.", file=sys.stderr)
+        sys.exit(1)

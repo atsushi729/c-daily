@@ -15,7 +15,7 @@ C_DAILY_LOG_DIR = Path(os.environ.get("C_DAILY_LOG_DIR", Path.home() / ".daily-l
 if str(C_DAILY_LIB) not in sys.path:
     sys.path.insert(0, str(C_DAILY_LIB))
 
-from constants import VERSION  # noqa: E402
+from constants import VERSION, validate_date  # noqa: E402
 
 
 def usage() -> None:
@@ -68,6 +68,7 @@ def main() -> None:
 
     elif cmd == "show":
         target_date = args[0] if args else str(date.today())
+        _validate_date(target_date)
         subprocess.run([sys.executable, str(C_DAILY_LIB / "aggregate.py"), target_date], check=True)
         outfile = C_DAILY_LOG_DIR / f"{target_date}.md"
         if outfile.exists():
@@ -85,6 +86,7 @@ def main() -> None:
 
     elif cmd == "raw":
         target_date = args[0] if args else str(date.today())
+        _validate_date(target_date)
         raw_file = C_DAILY_LOG_DIR / "raw" / f"{target_date}.jsonl"
         if raw_file.exists():
             print(raw_file.read_text(encoding="utf-8"), end="")

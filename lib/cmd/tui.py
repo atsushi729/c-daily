@@ -8,11 +8,19 @@ Usage:
 import sys
 from pathlib import Path
 
+_CMD_DIR = Path(__file__).resolve().parent.parent  # lib/cmd/ → lib/
+if str(_CMD_DIR) not in sys.path:
+    sys.path.insert(0, str(_CMD_DIR))
+
+from constants import validate_date  # noqa: E402
+
 
 def run(lib_dir: Path, log_dir: Path) -> None:
     # Optional date argument from sys.argv
     args = sys.argv[2:]
     date_filter = args[0] if args else None
+    if date_filter is not None:
+        validate_date(date_filter)
 
     # Add lib_dir to path so tui.py can import session_reader
     if str(lib_dir) not in sys.path:

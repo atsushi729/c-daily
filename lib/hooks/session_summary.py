@@ -13,11 +13,12 @@ Calling `claude -p` inside a Stop hook starts a new Claude Code session,
 which fires another Stop hook when it finishes → infinite recursion.
 A plain HTTP call to the API has no hook awareness, so it is safe.
 """
+import fcntl
 import json
 import os
 import re
-import subprocess
 import sys
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -60,16 +61,14 @@ ts = datetime.now().isoformat()
 today = datetime.now().strftime("%Y-%m-%d")
 outfile = LOG_DIR_RAW / f"{today}.jsonl"
 transcript_path = payload.get("transcript_path", "")
+if not isinstance(transcript_path, str):
+    transcript_path = ""
 
 # ---------------------------------------------------------------------------
-# Step 1: Extract metadata from transcript
+# Read transcript once — entries reused by Step 1 and Step 4
 # ---------------------------------------------------------------------------
 
-first_msg = ""
-turns = 0
-cost_usd = None
-total_tokens = 0
-
+transcript_entries: list[dict] = []
 if transcript_path and os.path.exists(transcript_path):
     try:
         with open(transcript_path, encoding="utf-8") as f:
@@ -78,50 +77,60 @@ if transcript_path and os.path.exists(transcript_path):
                 if not line:
                     continue
                 try:
-                    entry = json.loads(line)
+                    transcript_entries.append(json.loads(line))
                 except json.JSONDecodeError:
                     continue
-
-                role = entry.get("type") or entry.get("role", "")
-                msg_obj = entry.get("message", {})
-                content = (
-                    msg_obj.get("content", "")
-                    if msg_obj
-                    else entry.get("content", "")
-                )
-
-                if role == "user" and not first_msg:
-                    if isinstance(content, list):
-                        for block in content:
-                            if isinstance(block, dict) and block.get("type") == "text":
-                                first_msg = block["text"][:_FIRST_MSG_PREVIEW_LEN]
-                                break
-                    elif isinstance(content, str):
-                        first_msg = content[:_FIRST_MSG_PREVIEW_LEN]
-
-                if role in ("assistant", "user"):
-                    turns += 1
-
-                cost_usd = (
-                    entry.get("costUSD")
-                    or entry.get("cost_usd")
-                    or (msg_obj or {}).get("costUSD")
-                    or cost_usd
-                )
-
-                if role == "assistant":
-                    usage = (
-                        (msg_obj or {}).get("usage")
-                        or entry.get("usage")
-                        or {}
-                    )
-                    if isinstance(usage, dict):
-                        total_tokens += (
-                            (usage.get("input_tokens") or 0)
-                            + (usage.get("output_tokens") or 0)
-                        )
     except Exception:
         pass
+
+# ---------------------------------------------------------------------------
+# Step 1: Extract metadata from transcript entries
+# ---------------------------------------------------------------------------
+
+first_msg = ""
+turns = 0
+cost_usd = None
+total_tokens = 0
+
+for entry in transcript_entries:
+    role = entry.get("type") or entry.get("role", "")
+    msg_obj = entry.get("message", {})
+    content = (
+        msg_obj.get("content", "")
+        if msg_obj
+        else entry.get("content", "")
+    )
+
+    if role == "user" and not first_msg:
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    first_msg = block["text"][:_FIRST_MSG_PREVIEW_LEN]
+                    break
+        elif isinstance(content, str):
+            first_msg = content[:_FIRST_MSG_PREVIEW_LEN]
+
+    if role in ("assistant", "user"):
+        turns += 1
+
+    cost_usd = (
+        entry.get("costUSD")
+        or entry.get("cost_usd")
+        or (msg_obj or {}).get("costUSD")
+        or cost_usd
+    )
+
+    if role == "assistant":
+        usage = (
+            (msg_obj or {}).get("usage")
+            or entry.get("usage")
+            or {}
+        )
+        if isinstance(usage, dict):
+            total_tokens += (
+                (usage.get("input_tokens") or 0)
+                + (usage.get("output_tokens") or 0)
+            )
 
 # ---------------------------------------------------------------------------
 # Step 2: Decode project name from transcript path
@@ -164,39 +173,30 @@ if cost_usd is not None:
 # ---------------------------------------------------------------------------
 
 api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-if api_key and transcript_path and os.path.exists(transcript_path):
+if api_key and transcript_entries:
     try:
         messages: list[str] = []
-        with open(transcript_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
+        for entry in transcript_entries:
+            role = entry.get("type") or entry.get("role", "")
+            if role not in ("user", "assistant"):
+                continue
 
-                role = entry.get("type") or entry.get("role", "")
-                if role not in ("user", "assistant"):
-                    continue
+            msg_obj = entry.get("message", {})
+            content = (
+                msg_obj.get("content", "")
+                if msg_obj
+                else entry.get("content", "")
+            )
+            text = ""
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        text += block["text"]
+            elif isinstance(content, str):
+                text = content
 
-                msg_obj = entry.get("message", {})
-                content = (
-                    msg_obj.get("content", "")
-                    if msg_obj
-                    else entry.get("content", "")
-                )
-                text = ""
-                if isinstance(content, list):
-                    for block in content:
-                        if isinstance(block, dict) and block.get("type") == "text":
-                            text += block["text"]
-                elif isinstance(content, str):
-                    text = content
-
-                if text.strip():
-                    messages.append(f"[{role}]: {text[:500]}")
+            if text.strip():
+                messages.append(f"[{role}]: {text[:500]}")
 
         if messages:
             transcript_text = "\n".join(messages[:_SUMMARY_MAX_MESSAGES])
@@ -218,32 +218,30 @@ if api_key and transcript_path and os.path.exists(transcript_path):
                 "messages": [{"role": "user", "content": prompt}],
             })
 
-            result = subprocess.run(
-                [
-                    "curl", "-fsSL",
-                    _API_URL,
-                    "-H", "Content-Type: application/json",
-                    "-H", f"x-api-key: {api_key}",
-                    "-H", f"anthropic-version: {_API_VERSION}",
-                    "-d", api_body,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30,
+            req = urllib.request.Request(
+                _API_URL,
+                data=api_body.encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": api_key,
+                    "anthropic-version": _API_VERSION,
+                },
+                method="POST",
             )
+            with urllib.request.urlopen(req, timeout=30) as response:
+                raw_response = response.read().decode()
 
-            if result.returncode == 0:
-                resp = json.loads(result.stdout)
-                raw_text = ""
-                for block in resp.get("content", []):
-                    if block.get("type") == "text":
-                        raw_text += block["text"]
-                m = re.search(r"\{.*\}", raw_text, re.DOTALL)
-                if m:
-                    try:
-                        record["decision_summary"] = json.loads(m.group())
-                    except json.JSONDecodeError:
-                        pass
+            resp = json.loads(raw_response)
+            raw_text = ""
+            for block in resp.get("content", []):
+                if block.get("type") == "text":
+                    raw_text += block["text"]
+            m = re.search(r"\{.*?\}", raw_text, re.DOTALL)
+            if m:
+                try:
+                    record["decision_summary"] = json.loads(m.group())
+                except json.JSONDecodeError:
+                    pass
     except Exception:
         pass  # decision_summary is optional; never block the main write
 
@@ -252,4 +250,5 @@ if api_key and transcript_path and os.path.exists(transcript_path):
 # ---------------------------------------------------------------------------
 
 with open(outfile, "a", encoding="utf-8") as f:
+    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
     f.write(json.dumps(record, ensure_ascii=False) + "\n")
