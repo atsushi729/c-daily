@@ -3,28 +3,20 @@
 c-daily aggregate.py
 JSONL raw log → daily Markdown generator
 """
-import json
 import sys
 import os
 from datetime import datetime, date
 from pathlib import Path
 
+# Add lib directory to path so session_reader is importable
+_LIB_DIR = Path(__file__).resolve().parent
+if str(_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(_LIB_DIR))
+
+from session_reader import load_jsonl, compute_project_stats  # noqa: E402
+
 LOG_BASE = Path(os.environ.get("C_DAILY_LOG_DIR", Path.home() / ".daily-logs"))
 RAW_DIR  = LOG_BASE / "raw"
-
-
-def load_jsonl(filepath: Path) -> list[dict]:
-    records = []
-    if not filepath.exists():
-        return records
-    for line in filepath.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line:
-            try:
-                records.append(json.loads(line))
-            except json.JSONDecodeError:
-                pass
-    return records
 
 
 def fmt_time(ts: str) -> str:
@@ -101,6 +93,29 @@ def build_md(target_date: str, records: list[dict]) -> str:
             if ds.get("selected"):
                 lines.append(f"**Selected:** {ds['selected']}")
             lines.append("")
+
+    # ── Transcript stats (from ~/.claude/projects/) ───────────────────────────
+    try:
+        proj_stats = compute_project_stats(target_date)
+        if proj_stats:
+            lines += ["## Claude Sessions by Project", ""]
+            lines += [
+                "| Project | Sessions | Turns | Files Edited | Commands | Tokens | Cost |",
+                "|---------|----------|-------|--------------|----------|--------|------|",
+            ]
+            for p in proj_stats:
+                lines.append(
+                    f"| {p['project_name']} "
+                    f"| {p['sessions']} "
+                    f"| {p['turns']} "
+                    f"| {p['files_edited']} "
+                    f"| {p['commands_run']} "
+                    f"| {fmt_tokens(p['total_tokens'])} "
+                    f"| ${p['cost_usd']:.4f} |"
+                )
+            lines.append("")
+    except Exception:
+        pass  # transcript stats are supplementary; never block main output
 
     lines += ["---", f"_Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_", ""]
     return "\n".join(lines)
