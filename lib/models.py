@@ -56,3 +56,25 @@ class SessionMeta:
         if local.tzinfo:
             local = local.astimezone().replace(tzinfo=None)
         return local.strftime("%Y-%m-%d")
+
+
+class ProjectItem:
+    """Aggregated stats for a single project, used by the TUI project browser."""
+
+    __slots__ = ("name", "session_count", "turns", "total_tokens", "cost_usd", "sessions")
+
+    def __init__(
+        self,
+        name: str,
+        session_count: int,
+        turns: int,
+        total_tokens: int,
+        cost_usd: float,
+        sessions: list[SessionMeta],
+    ):
+        self.name = name
+        self.session_count = session_count
+        self.turns = turns
+        self.total_tokens = total_tokens
+        self.cost_usd = cost_usd
+        self.sessions = sessions

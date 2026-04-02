@@ -30,7 +30,7 @@ import platform
 import subprocess
 import sys
 import unicodedata
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 # Import session_reader from the same lib directory
@@ -39,12 +39,10 @@ if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
 from constants import CLAUDE_PROJECTS_DIR  # noqa: E402
-from models import MessageRecord, SessionMeta  # noqa: E402
+from models import MessageRecord, ProjectItem, SessionMeta  # noqa: E402
 from session_reader import (  # noqa: E402
-    display_width,
     load_session_messages,
     load_sessions,
-    truncate_to_width,
 )
 
 # ── Color pair constants ──────────────────────────────────────────────────────
@@ -95,6 +93,42 @@ def _safe_addstr(win: curses.window, y: int, x: int, text: str, attr: int = 0) -
         win.addstr(y, x, text, attr)
 
 
+def _draw_header_line(stdscr: curses.window, title: str, cols: int) -> None:
+    title = truncate_to_width(title, cols - 1)
+    padding = " " * max(0, cols - display_width(title) - 1)
+    _safe_addstr(stdscr, 0, 0, title + padding, _cp(CP_HEADER) | curses.A_BOLD)
+
+
+def _draw_statusbar_line(stdscr: curses.window, row: int, cols: int, bar: str) -> None:
+    padding = " " * max(0, cols - display_width(bar) - 1)
+    _safe_addstr(stdscr, row, 0, bar + padding, _cp(CP_STATUSBAR))
+
+
+def _char_width(c: str) -> int:
+    ea = unicodedata.east_asian_width(c)
+    return 2 if ea in ("W", "F") else 1
+
+
+def display_width(s: str) -> int:
+    """Return terminal display width of a string, counting CJK chars as 2."""
+    if not any(ord(c) >= 128 for c in s):
+        return len(s)
+    return sum(_char_width(c) for c in s)
+
+
+def truncate_to_width(s: str, max_width: int) -> str:
+    """Truncate string so its display width does not exceed max_width."""
+    result: list[str] = []
+    current = 0
+    for c in s:
+        cw = _char_width(c)
+        if current + cw > max_width:
+            break
+        result.append(c)
+        current += cw
+    return "".join(result)
+
+
 def _wrap_text(text: str, width: int, indent: int = 0) -> list[str]:
     """Wrap text to fit within `width` display columns (single O(n) pass per chunk).
     Continuation lines are indented by `indent` spaces.
@@ -140,6 +174,7 @@ class _RenderLine:
     def __init__(self, text: str, attr: int):
         self.text = text
         self.attr = attr
+
 
 
 def _render_messages(messages: list[MessageRecord], pane_width: int) -> list[_RenderLine]:
@@ -300,10 +335,7 @@ class TUI:
             info = f" [{n}/{total}] filter: {self.filter_text}"
         else:
             info = f" [{total} sessions]"
-        title = f" c-daily TUI — {today}{info}"
-        title = truncate_to_width(title, cols - 1)
-        padding = " " * max(0, cols - display_width(title) - 1)
-        _safe_addstr(stdscr, 0, 0, title + padding, _cp(CP_HEADER) | curses.A_BOLD)
+        _draw_header_line(stdscr, f" c-daily TUI — {today}{info}", cols)
 
     def _draw_list(
         self,
@@ -421,8 +453,7 @@ class TUI:
             bar = f" {self._status_msg}"
         else:
             bar = " [q]quit  [j/k]move  [Tab]pane  [Enter]open  [/]filter  [r]reload  [d]summary"
-        padding = " " * max(0, cols - display_width(bar) - 1)
-        _safe_addstr(stdscr, row, 0, bar + padding, _cp(CP_STATUSBAR))
+        _draw_statusbar_line(stdscr, row, cols, bar)
 
     # ── Key handling ─────────────────────────────────────────────────────────
 
@@ -565,6 +596,387 @@ class TUI:
             self._status_msg = f"No summary found: {md_file.name}"
 
 
+# ── Project browser ──────────────────────────────────────────────────────────
+
+
+class ProjectTUI:
+    """Two-pane project browser.
+
+    Left pane: projects sorted by cost (descending).
+    Right pane: sessions for the selected project.
+    Enter: exits and signals the caller to open a session browser for that project.
+    """
+
+    def __init__(self, sessions: list):
+        grouped: dict[str, list] = {}
+        for s in sessions:
+            grouped.setdefault(s.project_name, []).append(s)
+
+        self.projects: list[ProjectItem] = []
+        for name, slist in grouped.items():
+            slist_sorted = sorted(
+                slist,
+                key=lambda x: (x.start_time or datetime.min).replace(tzinfo=None),
+                reverse=True,
+            )
+            self.projects.append(
+                ProjectItem(
+                    name=name,
+                    session_count=len(slist),
+                    turns=sum(s.turns for s in slist),
+                    total_tokens=sum(s.total_tokens for s in slist),
+                    cost_usd=sum(s.cost_usd for s in slist),
+                    sessions=slist_sorted,
+                )
+            )
+        self.projects.sort(key=lambda p: p.cost_usd, reverse=True)
+
+        self.selected = 0
+        self.scroll = 0
+        self._selected_project: ProjectItem | None = None
+
+    def run(self) -> "ProjectItem | None":
+        curses.wrapper(self._main)
+        return self._selected_project
+
+    def _main(self, stdscr: curses.window) -> None:
+        _init_colors()
+        curses.curs_set(0)
+        stdscr.keypad(True)
+
+        while True:
+            rows, cols = stdscr.getmaxyx()
+            if rows < 6 or cols < 40:
+                stdscr.clear()
+                _safe_addstr(stdscr, 0, 0, "Terminal too small (need 40x6 min)")
+                stdscr.refresh()
+                key = stdscr.getch()
+                if key in (ord("q"), ord("Q")):
+                    break
+                continue
+
+            stdscr.erase()
+            left_w = min(LEFT_MAX, max(LEFT_MIN, int(cols * LEFT_FRAC)))
+            self._draw(stdscr, rows, cols, left_w)
+            stdscr.refresh()
+
+            key = stdscr.getch()
+            if key in (ord("q"), ord("Q")):
+                break
+            elif key in (ord("j"), curses.KEY_DOWN):
+                self.selected = min(self.selected + 1, max(0, len(self.projects) - 1))
+            elif key in (ord("k"), curses.KEY_UP):
+                self.selected = max(0, self.selected - 1)
+            elif key in (ord("g"), curses.KEY_HOME):
+                self.selected = 0
+                self.scroll = 0
+            elif key in (ord("G"), curses.KEY_END):
+                self.selected = max(0, len(self.projects) - 1)
+            elif key == curses.KEY_PPAGE:
+                self.selected = max(0, self.selected - (rows - 3))
+            elif key == curses.KEY_NPAGE:
+                self.selected = min(len(self.projects) - 1, self.selected + (rows - 3))
+            elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+                if self.projects:
+                    self._selected_project = self.projects[self.selected]
+                    break
+
+    def _draw(self, stdscr: curses.window, rows: int, cols: int, left_w: int) -> None:
+        content_rows = rows - 2
+        self._draw_header(stdscr, cols)
+        self._draw_project_list(stdscr, content_rows, left_w)
+        for r in range(1, rows - 1):
+            _safe_addstr(stdscr, r, left_w, "|", _cp(CP_BORDER))
+        right_x = left_w + 1
+        right_w = cols - right_x
+        self._draw_session_list(stdscr, content_rows, right_x, right_w)
+        self._draw_statusbar(stdscr, rows - 1, cols)
+
+    def _draw_header(self, stdscr: curses.window, cols: int) -> None:
+        today = date.today().isoformat()
+        _draw_header_line(
+            stdscr, f" c-daily TUI — Projects — {today}  [{len(self.projects)} projects]", cols
+        )
+
+    def _draw_project_list(
+        self, stdscr: curses.window, content_rows: int, left_w: int
+    ) -> None:
+        if not self.projects:
+            _safe_addstr(stdscr, 2, 1, "No projects found", _cp(CP_DIM))
+            return
+
+        visible = content_rows
+        max_sel = max(0, len(self.projects) - 1)
+        self.selected = max(0, min(self.selected, max_sel))
+        if self.selected < self.scroll:
+            self.scroll = self.selected
+        if self.selected >= self.scroll + visible:
+            self.scroll = self.selected - visible + 1
+
+        name_w = max(8, left_w - 16)
+
+        for i in range(visible):
+            idx = i + self.scroll
+            if idx >= len(self.projects):
+                break
+            p = self.projects[idx]
+            row = i + 1
+            cursor = "> " if idx == self.selected else "  "
+            name = truncate_to_width(p.name, name_w)
+            name_pad = name + " " * max(0, name_w - display_width(name))
+            line = f"{cursor}{name_pad} {p.session_count:3d}s ${p.cost_usd:.3f}"
+            line = truncate_to_width(line, left_w - 1)
+            attr = (
+                _cp(CP_SELECTED) | curses.A_BOLD
+                if idx == self.selected
+                else _cp(CP_NORMAL)
+            )
+            _safe_addstr(stdscr, row, 0, line, attr)
+
+    def _draw_session_list(
+        self, stdscr: curses.window, content_rows: int, right_x: int, right_w: int
+    ) -> None:
+        if not self.projects or right_w < 10:
+            return
+        p = self.projects[self.selected]
+
+        h1 = f" {p.name}  —  {p.session_count} sessions  ${p.cost_usd:.4f}"
+        h2 = f" Turns: {p.turns}  Tokens: {_fmt_tokens(p.total_tokens)}"
+        sep = " " + "-" * max(0, right_w - 2)
+        _safe_addstr(
+            stdscr, 1, right_x, truncate_to_width(h1, right_w), _cp(CP_NORMAL) | curses.A_BOLD
+        )
+        _safe_addstr(stdscr, 2, right_x, truncate_to_width(h2, right_w), _cp(CP_DIM))
+        _safe_addstr(stdscr, 3, right_x, truncate_to_width(sep, right_w), _cp(CP_BORDER))
+
+        available = content_rows - 3
+        for i, s in enumerate(p.sessions[:available]):
+            preview = s.first_msg.replace("\n", " ").replace("\r", " ")
+            line = f" {s.fmt_date()} {s.fmt_start()}  {s.turns:3d}t  {preview}"
+            _safe_addstr(
+                stdscr, 4 + i, right_x, truncate_to_width(line, right_w - 1), _cp(CP_NORMAL)
+            )
+
+    def _draw_statusbar(self, stdscr: curses.window, row: int, cols: int) -> None:
+        _draw_statusbar_line(
+            stdscr, row, cols, " [q]quit  [j/k]move  [Enter]open sessions  [g/G]top/bottom"
+        )
+
+
+# ── Daily summary browser ─────────────────────────────────────────────────────
+
+
+class DailyTUI:
+    """Two-pane daily summary browser.
+
+    Left pane: list of daily log files (YYYY-MM-DD.md), newest first.
+    Right pane: rendered content of the selected file.
+    Tab switches focus; j/k navigates; Enter opens the file externally.
+    """
+
+    def __init__(self, log_dir: Path):
+        self.log_dir = log_dir
+        self.files: list[Path] = sorted(log_dir.glob("????-??-??.md"), reverse=True)
+
+        self.selected = 0
+        self.scroll = 0
+        self.content_scroll = 0
+        self.focus = "list"
+        self._content_cache: dict[str, list[str]] = {}
+
+    def run(self) -> None:
+        curses.wrapper(self._main)
+
+    def _main(self, stdscr: curses.window) -> None:
+        _init_colors()
+        curses.curs_set(0)
+        stdscr.keypad(True)
+        stdscr.timeout(500)
+
+        while True:
+            rows, cols = stdscr.getmaxyx()
+            if rows < 6 or cols < 40:
+                stdscr.clear()
+                _safe_addstr(stdscr, 0, 0, "Terminal too small (need 40x6 min)")
+                stdscr.refresh()
+                key = stdscr.getch()
+                if key in (ord("q"), ord("Q")):
+                    break
+                continue
+
+            stdscr.erase()
+            left_w = min(LEFT_MAX, max(LEFT_MIN, int(cols * LEFT_FRAC)))
+            self._draw(stdscr, rows, cols, left_w)
+            stdscr.refresh()
+
+            key = stdscr.getch()
+            if key == -1:
+                continue
+            if key in (ord("q"), ord("Q")):
+                break
+            elif key in (ord("\t"), curses.KEY_BTAB):
+                self.focus = "content" if self.focus == "list" else "list"
+            elif key in (ord("j"), curses.KEY_DOWN):
+                if self.focus == "list":
+                    self.selected = min(self.selected + 1, max(0, len(self.files) - 1))
+                    self.content_scroll = 0
+                else:
+                    self.content_scroll += 1
+            elif key in (ord("k"), curses.KEY_UP):
+                if self.focus == "list":
+                    self.selected = max(0, self.selected - 1)
+                    self.content_scroll = 0
+                else:
+                    self.content_scroll = max(0, self.content_scroll - 1)
+            elif key in (ord("g"), curses.KEY_HOME):
+                if self.focus == "list":
+                    self.selected = 0
+                    self.scroll = 0
+                    self.content_scroll = 0
+                else:
+                    self.content_scroll = 0
+            elif key in (ord("G"), curses.KEY_END):
+                if self.focus == "list":
+                    self.selected = max(0, len(self.files) - 1)
+                    self.content_scroll = 0
+            elif key == curses.KEY_PPAGE:
+                if self.focus == "list":
+                    self.selected = max(0, self.selected - (rows - 3))
+                else:
+                    self.content_scroll = max(0, self.content_scroll - (rows - 5))
+            elif key == curses.KEY_NPAGE:
+                if self.focus == "list":
+                    self.selected = min(len(self.files) - 1, self.selected + (rows - 3))
+                else:
+                    self.content_scroll += rows - 5
+            elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+                if self.files:
+                    _open_file(self.files[self.selected])
+            elif key == curses.KEY_RESIZE:
+                self._content_cache.clear()
+
+    def _get_content_lines(self, path: Path, width: int) -> list[str]:
+        key = f"{path}:{width}"
+        if key not in self._content_cache:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                text = "(Unable to read file)"
+            lines: list[str] = []
+            for raw_line in text.split("\n"):
+                wrapped = _wrap_text(raw_line, width - 2)
+                lines.extend(wrapped if wrapped else [""])
+            self._content_cache[key] = lines
+        return self._content_cache[key]
+
+    def _draw(self, stdscr: curses.window, rows: int, cols: int, left_w: int) -> None:
+        content_rows = rows - 2
+        self._draw_header(stdscr, cols)
+        self._draw_file_list(stdscr, content_rows, left_w)
+        for r in range(1, rows - 1):
+            _safe_addstr(stdscr, r, left_w, "|", _cp(CP_BORDER))
+        right_x = left_w + 1
+        right_w = cols - right_x
+        self._draw_content(stdscr, content_rows, right_x, right_w)
+        self._draw_statusbar(stdscr, rows - 1, cols)
+
+    def _draw_header(self, stdscr: curses.window, cols: int) -> None:
+        today = date.today().isoformat()
+        _draw_header_line(
+            stdscr,
+            f" c-daily TUI — Daily Summaries — {today}  [{len(self.files)} files]",
+            cols,
+        )
+
+    def _draw_file_list(
+        self, stdscr: curses.window, content_rows: int, left_w: int
+    ) -> None:
+        if not self.files:
+            _safe_addstr(stdscr, 2, 1, "No daily logs found", _cp(CP_DIM))
+            return
+
+        visible = content_rows
+        max_sel = max(0, len(self.files) - 1)
+        self.selected = max(0, min(self.selected, max_sel))
+        if self.selected < self.scroll:
+            self.scroll = self.selected
+        if self.selected >= self.scroll + visible:
+            self.scroll = self.selected - visible + 1
+
+        for i in range(visible):
+            idx = i + self.scroll
+            if idx >= len(self.files):
+                break
+            f = self.files[idx]
+            row = i + 1
+            cursor = "> " if idx == self.selected else "  "
+            date_str = f.stem
+            try:
+                size = f.stat().st_size
+                size_str = f"{size // 1024}K" if size >= 1024 else f"{size}B"
+            except OSError:
+                size_str = "?"
+            line = f"{cursor}{date_str}  {size_str:>6}"
+            line = truncate_to_width(line, left_w - 1)
+            is_sel = idx == self.selected
+            if is_sel and self.focus == "list":
+                attr = _cp(CP_SELECTED) | curses.A_BOLD
+            elif is_sel:
+                attr = curses.A_BOLD
+            else:
+                attr = _cp(CP_NORMAL)
+            _safe_addstr(stdscr, row, 0, line, attr)
+
+    def _draw_content(
+        self, stdscr: curses.window, content_rows: int, right_x: int, right_w: int
+    ) -> None:
+        if not self.files or right_w < 10:
+            return
+
+        f = self.files[self.selected]
+        lines = self._get_content_lines(f, right_w)
+
+        total = len(lines)
+        available = content_rows - 1
+        max_scroll = max(0, total - available)
+        self.content_scroll = max(0, min(self.content_scroll, max_scroll))
+
+        for i in range(available):
+            line_idx = i + self.content_scroll
+            if line_idx >= total:
+                break
+            line = lines[line_idx]
+            if line.startswith("# "):
+                attr = _cp(CP_USER) | curses.A_BOLD
+            elif line.startswith("## "):
+                attr = _cp(CP_ASSISTANT) | curses.A_BOLD
+            elif line.startswith("### "):
+                attr = _cp(CP_TOOL) | curses.A_BOLD
+            elif line.startswith("|"):
+                attr = _cp(CP_DIM)
+            else:
+                attr = _cp(CP_NORMAL)
+            _safe_addstr(
+                stdscr, 1 + i, right_x, truncate_to_width(" " + line, right_w - 1), attr
+            )
+
+        if total > available and max_scroll:
+            pct = int(self.content_scroll / max_scroll * 100)
+            indicator = f" {pct}%"
+            _safe_addstr(
+                stdscr,
+                available,
+                right_x + right_w - len(indicator) - 1,
+                indicator,
+                _cp(CP_DIM),
+            )
+
+    def _draw_statusbar(self, stdscr: curses.window, row: int, cols: int) -> None:
+        _draw_statusbar_line(
+            stdscr, row, cols, " [q]quit  [j/k]move  [Tab]pane  [Enter]open  [g/G]top/bottom"
+        )
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 
@@ -592,3 +1004,27 @@ def run_tui(
     app = TUI(sessions=sessions, log_dir=log_dir)
     with contextlib.suppress(KeyboardInterrupt):
         app.run()
+
+
+def run_tui_project(log_dir: Path) -> None:
+    """Launch the project browser; Enter opens a session browser for the chosen project."""
+    print("Loading sessions...", end="", flush=True)
+    sessions = load_sessions(claude_dir=CLAUDE_PROJECTS_DIR)
+    print(f"\r{' ' * 20}\r", end="", flush=True)
+
+    ptui = ProjectTUI(sessions=sessions)
+    selected = None
+    with contextlib.suppress(KeyboardInterrupt):
+        selected = ptui.run()
+
+    if selected is not None:
+        app = TUI(sessions=selected.sessions, log_dir=log_dir)
+        with contextlib.suppress(KeyboardInterrupt):
+            app.run()
+
+
+def run_tui_daily(log_dir: Path) -> None:
+    """Launch the daily summary browser."""
+    dtui = DailyTUI(log_dir=log_dir)
+    with contextlib.suppress(KeyboardInterrupt):
+        dtui.run()

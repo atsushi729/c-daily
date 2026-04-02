@@ -10,7 +10,6 @@ from __future__ import annotations
 import contextlib
 import json
 import sys
-import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -31,19 +30,15 @@ from constants import (  # noqa: E402
 )
 from models import MessageRecord, SessionMeta  # noqa: E402
 
-# Re-export for consumers that import these names from session_reader
 __all__ = [
-    "CLAUDE_PROJECTS_DIR",
     "MessageRecord",
     "SessionMeta",
     "compute_project_stats",
     "decode_project_name",
-    "display_width",
     "load_jsonl",
     "load_session_messages",
     "load_session_meta",
     "load_sessions",
-    "truncate_to_width",
 ]
 
 
@@ -59,30 +54,6 @@ def decode_project_name(encoded: str) -> str:
         return "-".join(reversed(meaningful))
     return parts[-1] if parts else encoded
 
-
-def _char_width(c: str) -> int:
-    ea = unicodedata.east_asian_width(c)
-    return 2 if ea in ("W", "F") else 1
-
-
-def display_width(s: str) -> int:
-    """Return terminal display width of a string, counting CJK chars as 2."""
-    if not any(ord(c) >= 128 for c in s):
-        return len(s)
-    return sum(_char_width(c) for c in s)
-
-
-def truncate_to_width(s: str, max_width: int) -> str:
-    """Truncate string so its display width does not exceed max_width."""
-    result: list[str] = []
-    current = 0
-    for c in s:
-        cw = _char_width(c)
-        if current + cw > max_width:
-            break
-        result.append(c)
-        current += cw
-    return "".join(result)
 
 
 def _extract_text(content: str | list[Any], plain_only: bool = False) -> str:
