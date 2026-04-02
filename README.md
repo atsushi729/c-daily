@@ -102,6 +102,28 @@ export C_DAILY_LOG_DIR="$HOME/Documents/logs"
 - [ ] Obsidian vault output
 - [ ] Multi-project cross-view
 
+## 🧪 Development
+
+### Running tests
+
+```bash
+python3 -m pytest tests/ -v
+```
+
+### Linting and type checking
+
+```bash
+ruff check lib/ tests/        # lint
+ruff format lib/ tests/       # format
+mypy lib/ tests/              # type check
+```
+
+Run all checks at once:
+
+```bash
+ruff check lib/ tests/ && ruff format --check lib/ tests/ && mypy lib/ tests/
+```
+
 ## 🤝 Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
