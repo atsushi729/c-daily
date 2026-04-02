@@ -1,20 +1,20 @@
 """
 models.py — shared dataclasses for c-daily.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
 class MessageRecord:
     """A single message (user or assistant) within a session transcript."""
 
-    role: str      # "user" or "assistant"
-    content: str   # rendered text
+    role: str  # "user" or "assistant"
+    content: str  # rendered text
     timestamp: str
 
 
@@ -28,14 +28,14 @@ class SessionMeta:
     """
 
     session_id: str
-    project_dir: str    # raw encoded directory name from ~/.claude/projects/
-    project_name: str   # decoded human-readable name
+    project_dir: str  # raw encoded directory name from ~/.claude/projects/
+    project_name: str  # decoded human-readable name
     file_path: Path
-    first_msg: str      # first user message preview (≤ FIRST_MSG_PREVIEW_LEN chars)
-    turns: int          # number of user turns
+    first_msg: str  # first user message preview (≤ FIRST_MSG_PREVIEW_LEN chars)
+    turns: int  # number of user turns
     total_tokens: int
     cost_usd: float
-    start_time: Optional[datetime]
+    start_time: datetime | None
     messages: list[MessageRecord] = field(default_factory=list)
     messages_loaded: bool = False
 

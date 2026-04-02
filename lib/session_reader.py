@@ -4,14 +4,16 @@ session_reader.py — reads ~/.claude/projects/ JSONL transcripts.
 
 Provides fast metadata loading and lazy full-message loading.
 """
+
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 import unicodedata
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 # Ensure lib/ is importable regardless of working directory
 _LIB_DIR = Path(__file__).resolve().parent
@@ -83,7 +85,7 @@ def truncate_to_width(s: str, max_width: int) -> str:
     return "".join(result)
 
 
-def _extract_text(content, plain_only: bool = False) -> str:
+def _extract_text(content: str | list[Any], plain_only: bool = False) -> str:
     """Extract text from a message content value (str or list of blocks).
 
     plain_only=True returns only literal text blocks, joined with spaces (used
@@ -125,18 +127,16 @@ def _extract_text(content, plain_only: bool = False) -> str:
     return str(content).strip()
 
 
-def load_jsonl(path: Path) -> list[dict]:
+def load_jsonl(path: Path) -> list[dict[str, Any]]:
     """Parse all lines of a JSONL file, skipping blank and malformed lines."""
-    records: list[dict] = []
+    records: list[dict[str, Any]] = []
     try:
         with open(path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line:
-                    try:
+                    with contextlib.suppress(json.JSONDecodeError):
                         records.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        pass
     except OSError:
         pass
     return records
@@ -144,9 +144,9 @@ def load_jsonl(path: Path) -> list[dict]:
 
 def _build_session_meta(
     path: Path,
-    records: list[dict],
-    project_name: Optional[str] = None,
-) -> Optional[SessionMeta]:
+    records: list[dict[str, Any]],
+    project_name: str | None = None,
+) -> SessionMeta | None:
     """Build a SessionMeta from pre-parsed records (no file I/O)."""
     if not records:
         return None
@@ -188,19 +188,14 @@ def _build_session_meta(
                 total_output += usage.get("output_tokens", 0) or 0
 
     total_tokens = total_input + total_output
-    cost_usd = (
-        total_input * INPUT_COST_PER_TOKEN
-        + total_output * OUTPUT_COST_PER_TOKEN
-    )
+    cost_usd = total_input * INPUT_COST_PER_TOKEN + total_output * OUTPUT_COST_PER_TOKEN
 
     start_time = None
     if timestamps:
         parsed: list[datetime] = []
         for t in timestamps:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 parsed.append(datetime.fromisoformat(t.replace("Z", "+00:00")))
-            except (ValueError, TypeError):
-                pass
         if parsed:
             start_time = min(parsed)
 
@@ -217,7 +212,7 @@ def _build_session_meta(
     )
 
 
-def _build_messages(records: list[dict]) -> list[MessageRecord]:
+def _build_messages(records: list[dict[str, Any]]) -> list[MessageRecord]:
     """Extract MessageRecord list from pre-parsed records (no file I/O)."""
     messages: list[MessageRecord] = []
     for rec in records:
@@ -236,9 +231,7 @@ def _build_messages(records: list[dict]) -> list[MessageRecord]:
     return messages
 
 
-def load_session_meta(
-    path: Path, project_name: Optional[str] = None
-) -> Optional[SessionMeta]:
+def load_session_meta(path: Path, project_name: str | None = None) -> SessionMeta | None:
     """Load metadata for a single session JSONL file (messages not populated)."""
     return _build_session_meta(path, load_jsonl(path), project_name)
 
@@ -255,14 +248,15 @@ def _sort_key(s: SessionMeta) -> datetime:
     """Comparable sort key from start_time (all returned values are naive)."""
     if s.start_time is None:
         return datetime.min
-    if s.start_time.tzinfo is not None:
-        return s.start_time.replace(tzinfo=None)
-    return s.start_time
+    start: datetime = s.start_time
+    if start.tzinfo is not None:
+        return start.replace(tzinfo=None)
+    return start
 
 
 def load_sessions(
-    date_filter: Optional[str] = None,
-    project_filter: Optional[str] = None,
+    date_filter: str | None = None,
+    project_filter: str | None = None,
     claude_dir: Path = CLAUDE_PROJECTS_DIR,
 ) -> list[SessionMeta]:
     """
@@ -284,10 +278,8 @@ def load_sessions(
 
     target_date = None
     if date_filter:
-        try:
+        with contextlib.suppress(ValueError):
             target_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
-        except ValueError:
-            pass
 
     for project_path in claude_dir.iterdir():
         if not project_path.is_dir():
@@ -322,7 +314,7 @@ def load_sessions(
 def compute_project_stats(
     date_filter: str,
     claude_dir: Path = CLAUDE_PROJECTS_DIR,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """
     Compute per-project stats for a given date from transcripts.
     Each JSONL file is read only once (metadata and tool stats extracted together).
@@ -340,7 +332,7 @@ def compute_project_stats(
     if not claude_dir.is_dir():
         return []
 
-    stats: dict[str, dict] = {}
+    stats: dict[str, dict[str, Any]] = {}
 
     for project_path in claude_dir.iterdir():
         if not project_path.is_dir():
@@ -409,14 +401,16 @@ def compute_project_stats(
 
     result = []
     for s in stats.values():
-        result.append({
-            "project_name": s["project_name"],
-            "sessions": s["sessions"],
-            "turns": s["turns"],
-            "total_tokens": s["total_tokens"],
-            "cost_usd": s["cost_usd"],
-            "files_edited": len(s["files_edited"]),
-            "commands_run": s["commands_run"],
-        })
+        result.append(
+            {
+                "project_name": s["project_name"],
+                "sessions": s["sessions"],
+                "turns": s["turns"],
+                "total_tokens": s["total_tokens"],
+                "cost_usd": s["cost_usd"],
+                "files_edited": len(s["files_edited"]),
+                "commands_run": s["commands_run"],
+            }
+        )
     result.sort(key=lambda x: x["cost_usd"], reverse=True)
     return result

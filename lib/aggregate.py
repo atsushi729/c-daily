@@ -2,10 +2,12 @@
 """
 aggregate.py — JSONL raw log → daily Markdown generator.
 """
+
 import os
 import sys
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
 # Ensure lib/ is importable regardless of working directory
 _LIB_DIR = Path(__file__).resolve().parent
@@ -26,13 +28,13 @@ def fmt_time(ts: str) -> str:
         return ts
 
 
-def fmt_tokens(n) -> str:
+def fmt_tokens(n: int | float | None) -> str:
     if not n:
         return "—"
     return f"{int(n):,}"
 
 
-def build_md(target_date: str, records: list[dict]) -> str:
+def build_md(target_date: str, records: list[dict[str, Any]]) -> str:
     lines = [f"# Daily Log — {target_date}", ""]
 
     sessions = [r for r in records if r.get("type") == "session_summary"]
@@ -47,7 +49,8 @@ def build_md(target_date: str, records: list[dict]) -> str:
 
     # ── Summary ───────────────────────────────────────────────────────────────
     lines += [
-        "## Summary", "",
+        "## Summary",
+        "",
         "| | |",
         "|---|---|",
         f"| Sessions | {len(sessions)} |",
@@ -58,7 +61,8 @@ def build_md(target_date: str, records: list[dict]) -> str:
 
     # ── Sessions table ────────────────────────────────────────────────────────
     lines += [
-        "## Sessions", "",
+        "## Sessions",
+        "",
         "| Time | Project | Session | Tokens |",
         "|------|---------|---------|--------|",
     ]

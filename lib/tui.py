@@ -21,8 +21,10 @@ Keybindings:
   r           Refresh session list
   q / Q       Quit
 """
+
 from __future__ import annotations
 
+import contextlib
 import curses
 import platform
 import subprocess
@@ -30,7 +32,6 @@ import sys
 import unicodedata
 from datetime import date
 from pathlib import Path
-from typing import Optional
 
 # Import session_reader from the same lib directory
 _LIB_DIR = Path(__file__).resolve().parent
@@ -47,18 +48,18 @@ from session_reader import (  # noqa: E402
 )
 
 # ── Color pair constants ──────────────────────────────────────────────────────
-CP_NORMAL    = 0   # default terminal colors
-CP_HEADER    = 1   # header bar
-CP_STATUSBAR = 2   # status bar
-CP_SELECTED  = 3   # selected list item
-CP_DIM       = 4   # secondary/dimmed text
-CP_USER      = 5   # user message label
-CP_ASSISTANT = 6   # assistant message label
-CP_TOOL      = 7   # tool call/result
-CP_BORDER    = 8   # pane separators and borders
+CP_NORMAL = 0  # default terminal colors
+CP_HEADER = 1  # header bar
+CP_STATUSBAR = 2  # status bar
+CP_SELECTED = 3  # selected list item
+CP_DIM = 4  # secondary/dimmed text
+CP_USER = 5  # user message label
+CP_ASSISTANT = 6  # assistant message label
+CP_TOOL = 7  # tool call/result
+CP_BORDER = 8  # pane separators and borders
 
-LEFT_MIN = 28     # minimum left pane width
-LEFT_MAX = 45     # maximum left pane width
+LEFT_MIN = 28  # minimum left pane width
+LEFT_MAX = 45  # maximum left pane width
 LEFT_FRAC = 0.36  # fraction of total cols for left pane
 
 
@@ -67,14 +68,14 @@ def _init_colors() -> bool:
     try:
         curses.start_color()
         curses.use_default_colors()
-        curses.init_pair(CP_HEADER,    curses.COLOR_WHITE,  curses.COLOR_BLUE)
-        curses.init_pair(CP_STATUSBAR, curses.COLOR_WHITE,  curses.COLOR_BLACK)
-        curses.init_pair(CP_SELECTED,  curses.COLOR_BLACK,  curses.COLOR_CYAN)
-        curses.init_pair(CP_DIM,       curses.COLOR_WHITE,  -1)
-        curses.init_pair(CP_USER,      curses.COLOR_CYAN,   -1)
-        curses.init_pair(CP_ASSISTANT, curses.COLOR_GREEN,  -1)
-        curses.init_pair(CP_TOOL,      curses.COLOR_YELLOW, -1)
-        curses.init_pair(CP_BORDER,    curses.COLOR_WHITE,  -1)
+        curses.init_pair(CP_HEADER, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        curses.init_pair(CP_STATUSBAR, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        curses.init_pair(CP_SELECTED, curses.COLOR_BLACK, curses.COLOR_CYAN)
+        curses.init_pair(CP_DIM, curses.COLOR_WHITE, -1)
+        curses.init_pair(CP_USER, curses.COLOR_CYAN, -1)
+        curses.init_pair(CP_ASSISTANT, curses.COLOR_GREEN, -1)
+        curses.init_pair(CP_TOOL, curses.COLOR_YELLOW, -1)
+        curses.init_pair(CP_BORDER, curses.COLOR_WHITE, -1)
         return True
     except Exception:
         return False
@@ -88,12 +89,10 @@ def _cp(pair: int) -> int:
         return 0
 
 
-def _safe_addstr(win, y: int, x: int, text: str, attr: int = 0) -> None:
+def _safe_addstr(win: curses.window, y: int, x: int, text: str, attr: int = 0) -> None:
     """Add a string to a window, ignoring out-of-bounds errors."""
-    try:
+    with contextlib.suppress(curses.error):
         win.addstr(y, x, text, attr)
-    except curses.error:
-        pass
 
 
 def _wrap_text(text: str, width: int, indent: int = 0) -> list[str]:
@@ -134,6 +133,7 @@ def _wrap_text(text: str, width: int, indent: int = 0) -> list[str]:
 
 # ── Rendered line for the right pane ─────────────────────────────────────────
 
+
 class _RenderLine:
     __slots__ = ("text", "attr")
 
@@ -142,9 +142,7 @@ class _RenderLine:
         self.attr = attr
 
 
-def _render_messages(
-    messages: list[MessageRecord], pane_width: int
-) -> list[_RenderLine]:
+def _render_messages(messages: list[MessageRecord], pane_width: int) -> list[_RenderLine]:
     """
     Convert a list of MessageRecord objects into a flat list of _RenderLine,
     ready for display in the right pane.
@@ -191,6 +189,7 @@ def _open_file(path: Path) -> None:
 
 # ── Main TUI class ────────────────────────────────────────────────────────────
 
+
 class TUI:
     def __init__(
         self,
@@ -210,7 +209,7 @@ class TUI:
         self.focus = "list"
 
         self._rendered: list[_RenderLine] = []
-        self._rendered_for: Optional[str] = None
+        self._rendered_for: str | None = None
 
         self._status_msg = ""
 
@@ -222,7 +221,8 @@ class TUI:
             self.filtered = self.all_sessions[:]
         else:
             self.filtered = [
-                s for s in self.all_sessions
+                s
+                for s in self.all_sessions
                 if q in s.project_name.lower() or q in s.first_msg.lower()
             ]
 
@@ -240,7 +240,7 @@ class TUI:
     def run(self) -> None:
         curses.wrapper(self._main)
 
-    def _main(self, stdscr: "curses._CursesWindow") -> None:
+    def _main(self, stdscr: curses.window) -> None:
         _init_colors()
         curses.curs_set(0)
         stdscr.keypad(True)
@@ -274,12 +274,12 @@ class TUI:
 
     def _draw(
         self,
-        stdscr: "curses._CursesWindow",
+        stdscr: curses.window,
         rows: int,
         cols: int,
         left_w: int,
     ) -> None:
-        content_rows = rows - 2   # header + status bar
+        content_rows = rows - 2  # header + status bar
 
         self._draw_header(stdscr, cols)
         self._draw_list(stdscr, content_rows, left_w)
@@ -292,7 +292,7 @@ class TUI:
         self._draw_messages(stdscr, content_rows, right_x, right_w)
         self._draw_statusbar(stdscr, rows - 1, cols)
 
-    def _draw_header(self, stdscr: "curses._CursesWindow", cols: int) -> None:
+    def _draw_header(self, stdscr: curses.window, cols: int) -> None:
         today = date.today().isoformat()
         n = len(self.filtered)
         total = len(self.all_sessions)
@@ -307,7 +307,7 @@ class TUI:
 
     def _draw_list(
         self,
-        stdscr: "curses._CursesWindow",
+        stdscr: curses.window,
         content_rows: int,
         left_w: int,
     ) -> None:
@@ -349,7 +349,7 @@ class TUI:
 
     def _draw_messages(
         self,
-        stdscr: "curses._CursesWindow",
+        stdscr: curses.window,
         content_rows: int,
         right_x: int,
         right_w: int,
@@ -367,21 +367,18 @@ class TUI:
         h2 = f" Turns: {s.turns}  Tokens: {_fmt_tokens(s.total_tokens)}  ${s.cost_usd:.4f}"
         sep = " " + "-" * max(0, right_w - 2)
 
-        _safe_addstr(stdscr, 1, right_x,
-                     truncate_to_width(h1, right_w),
-                     _cp(CP_NORMAL) | curses.A_BOLD)
-        _safe_addstr(stdscr, 2, right_x,
-                     truncate_to_width(h2, right_w),
-                     _cp(CP_DIM))
-        _safe_addstr(stdscr, 3, right_x,
-                     truncate_to_width(sep, right_w),
-                     _cp(CP_BORDER))
+        _safe_addstr(
+            stdscr, 1, right_x, truncate_to_width(h1, right_w), _cp(CP_NORMAL) | curses.A_BOLD
+        )
+        _safe_addstr(stdscr, 2, right_x, truncate_to_width(h2, right_w), _cp(CP_DIM))
+        _safe_addstr(stdscr, 3, right_x, truncate_to_width(sep, right_w), _cp(CP_BORDER))
 
         available_rows = content_rows - header_rows
 
         if not s.messages_loaded:
-            _safe_addstr(stdscr, header_rows + 2, right_x + 1,
-                         "Press Enter to load messages", _cp(CP_DIM))
+            _safe_addstr(
+                stdscr, header_rows + 2, right_x + 1, "Press Enter to load messages", _cp(CP_DIM)
+            )
             return
 
         if self._rendered_for != s.session_id:
@@ -399,8 +396,7 @@ class TUI:
                 break
             rl = self._rendered[line_idx]
             row = 1 + header_rows + i
-            _safe_addstr(stdscr, row, right_x,
-                         truncate_to_width(rl.text, right_w - 1), rl.attr)
+            _safe_addstr(stdscr, row, right_x, truncate_to_width(rl.text, right_w - 1), rl.attr)
 
         if total_lines > available_rows:
             pct = int(self.msg_scroll / max_scroll * 100) if max_scroll else 100
@@ -415,7 +411,7 @@ class TUI:
 
     def _draw_statusbar(
         self,
-        stdscr: "curses._CursesWindow",
+        stdscr: curses.window,
         row: int,
         cols: int,
     ) -> None:
@@ -424,10 +420,7 @@ class TUI:
         elif self._status_msg:
             bar = f" {self._status_msg}"
         else:
-            bar = (
-                " [q]quit  [j/k]move  [Tab]pane  [Enter]open  "
-                "[/]filter  [r]reload  [d]summary"
-            )
+            bar = " [q]quit  [j/k]move  [Tab]pane  [Enter]open  [/]filter  [r]reload  [d]summary"
         padding = " " * max(0, cols - display_width(bar) - 1)
         _safe_addstr(stdscr, row, 0, bar + padding, _cp(CP_STATUSBAR))
 
@@ -527,10 +520,7 @@ class TUI:
 
         elif key == curses.KEY_NPAGE:
             if self.focus == "list":
-                self.selected = min(
-                    len(self.filtered) - 1,
-                    self.selected + (content_rows - 1)
-                )
+                self.selected = min(len(self.filtered) - 1, self.selected + (content_rows - 1))
             else:
                 self.msg_scroll += content_rows - 4
 
@@ -577,10 +567,11 @@ class TUI:
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
+
 def run_tui(
     log_dir: Path,
-    date_filter: Optional[str] = None,
-    project_filter: Optional[str] = None,
+    date_filter: str | None = None,
+    project_filter: str | None = None,
 ) -> None:
     """
     Launch the TUI session browser.
@@ -599,7 +590,5 @@ def run_tui(
     print(f"\r{' ' * 20}\r", end="", flush=True)
 
     app = TUI(sessions=sessions, log_dir=log_dir)
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         app.run()
-    except KeyboardInterrupt:
-        pass

@@ -46,11 +46,10 @@ def run(log_dir: Path) -> None:
 
     # Check launchd (macOS)
     if platform.system() == "Darwin":
-        result = subprocess.run(
-            ["launchctl", "list"], capture_output=True, text=True
-        )
+        result = subprocess.run(["launchctl", "list"], capture_output=True, text=True)
         if LAUNCHD_LABEL in result.stdout:
-            print(f"✅ launchd           : registered (daily at {LAUNCHD_HOUR:02d}:{LAUNCHD_MINUTE:02d})")
+            time_str = f"{LAUNCHD_HOUR:02d}:{LAUNCHD_MINUTE:02d}"
+            print(f"✅ launchd           : registered (daily at {time_str})")
         else:
             print("❌ launchd           : not registered (run c-daily install)")
 

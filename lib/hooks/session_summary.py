@@ -13,6 +13,8 @@ Calling `claude -p` inside a Stop hook starts a new Claude Code session,
 which fires another Stop hook when it finishes → infinite recursion.
 A plain HTTP call to the API has no hook awareness, so it is safe.
 """
+
+import contextlib
 import fcntl
 import json
 import os
@@ -21,6 +23,7 @@ import sys
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Local constants (mirrors lib/constants.py — update both when changing)
@@ -34,11 +37,20 @@ _SUMMARY_MAX_TOKENS = 512
 _SUMMARY_MAX_MESSAGES = 40  # max message lines fed to summarization prompt
 
 # Path segments stripped when decoding project name from transcript path
-_SKIP_DIRS = frozenset({
-    "Desktop", "Documents", "Downloads",
-    "home", "projects", "workspace",
-    "src", "code", "dev", "work",
-})
+_SKIP_DIRS = frozenset(
+    {
+        "Desktop",
+        "Documents",
+        "Downloads",
+        "home",
+        "projects",
+        "workspace",
+        "src",
+        "code",
+        "dev",
+        "work",
+    }
+)
 
 # Display limits
 _FIRST_MSG_PREVIEW_LEN = 100
@@ -68,7 +80,7 @@ if not isinstance(transcript_path, str):
 # Read transcript once — entries reused by Step 1 and Step 4
 # ---------------------------------------------------------------------------
 
-transcript_entries: list[dict] = []
+transcript_entries: list[dict[str, Any]] = []
 if transcript_path and os.path.exists(transcript_path):
     try:
         with open(transcript_path, encoding="utf-8") as f:
@@ -95,11 +107,7 @@ total_tokens = 0
 for entry in transcript_entries:
     role = entry.get("type") or entry.get("role", "")
     msg_obj = entry.get("message", {})
-    content = (
-        msg_obj.get("content", "")
-        if msg_obj
-        else entry.get("content", "")
-    )
+    content = msg_obj.get("content", "") if msg_obj else entry.get("content", "")
 
     if role == "user" and not first_msg:
         if isinstance(content, list):
@@ -114,23 +122,13 @@ for entry in transcript_entries:
         turns += 1
 
     cost_usd = (
-        entry.get("costUSD")
-        or entry.get("cost_usd")
-        or (msg_obj or {}).get("costUSD")
-        or cost_usd
+        entry.get("costUSD") or entry.get("cost_usd") or (msg_obj or {}).get("costUSD") or cost_usd
     )
 
     if role == "assistant":
-        usage = (
-            (msg_obj or {}).get("usage")
-            or entry.get("usage")
-            or {}
-        )
+        usage = (msg_obj or {}).get("usage") or entry.get("usage") or {}
         if isinstance(usage, dict):
-            total_tokens += (
-                (usage.get("input_tokens") or 0)
-                + (usage.get("output_tokens") or 0)
-            )
+            total_tokens += (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
 
 # ---------------------------------------------------------------------------
 # Step 2: Decode project name from transcript path
@@ -153,7 +151,7 @@ if transcript_path:
 # Step 3: Build the base record
 # ---------------------------------------------------------------------------
 
-record: dict = {
+record: dict[str, Any] = {
     "type": "session_summary",
     "timestamp": ts,
     "project_name": project_name,
@@ -182,11 +180,7 @@ if api_key and transcript_entries:
                 continue
 
             msg_obj = entry.get("message", {})
-            content = (
-                msg_obj.get("content", "")
-                if msg_obj
-                else entry.get("content", "")
-            )
+            content = msg_obj.get("content", "") if msg_obj else entry.get("content", "")
             text = ""
             if isinstance(content, list):
                 for block in content:
@@ -212,11 +206,13 @@ if api_key and transcript_entries:
                 f"Transcript:\n{transcript_text}"
             )
 
-            api_body = json.dumps({
-                "model": _SUMMARY_MODEL,
-                "max_tokens": _SUMMARY_MAX_TOKENS,
-                "messages": [{"role": "user", "content": prompt}],
-            })
+            api_body = json.dumps(
+                {
+                    "model": _SUMMARY_MODEL,
+                    "max_tokens": _SUMMARY_MAX_TOKENS,
+                    "messages": [{"role": "user", "content": prompt}],
+                }
+            )
 
             req = urllib.request.Request(
                 _API_URL,
@@ -238,10 +234,8 @@ if api_key and transcript_entries:
                     raw_text += block["text"]
             m = re.search(r"\{.*?\}", raw_text, re.DOTALL)
             if m:
-                try:
+                with contextlib.suppress(json.JSONDecodeError):
                     record["decision_summary"] = json.loads(m.group())
-                except json.JSONDecodeError:
-                    pass
     except Exception:
         pass  # decision_summary is optional; never block the main write
 

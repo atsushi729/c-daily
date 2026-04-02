@@ -2,6 +2,7 @@
 tests/test_aggregate.py
 Unit tests for aggregate.py
 """
+
 import json
 import sys
 import tempfile
@@ -9,19 +10,20 @@ from pathlib import Path
 
 # Add lib/ to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
-from aggregate import build_md, load_jsonl, fmt_time, fmt_tokens
-
+from aggregate import build_md, fmt_time, fmt_tokens
+from session_reader import load_jsonl
 
 # --- Fixtures ---
 
+
 def make_session(ts="2026-03-23T10:00:00", **kwargs):
     base = {
-        "type":         "session_summary",
-        "timestamp":    ts,
+        "type": "session_summary",
+        "timestamp": ts,
         "project_name": "my-project",
-        "first_msg":    "Fix the login bug",
-        "turns":        6,
-        "cost_usd":     0.0100,
+        "first_msg": "Fix the login bug",
+        "turns": 6,
+        "cost_usd": 0.0100,
         "total_tokens": 5000,
     }
     base.update(kwargs)
@@ -31,13 +33,17 @@ def make_session(ts="2026-03-23T10:00:00", **kwargs):
 SESSION_A = make_session(
     ts="2026-03-23T10:00:00",
     first_msg="Refactoring auth module",
-    turns=12, cost_usd=0.0231, total_tokens=15420,
+    turns=12,
+    cost_usd=0.0231,
+    total_tokens=15420,
     project_name="my-app",
 )
 SESSION_B = make_session(
     ts="2026-03-23T17:42:00",
     first_msg="テストのリファクタリングをしたい",
-    turns=8, cost_usd=0.0148, total_tokens=9850,
+    turns=8,
+    cost_usd=0.0148,
+    total_tokens=9850,
     project_name="my-app",
 )
 SESSION_WITH_DECISION = make_session(
@@ -53,6 +59,7 @@ SESSION_WITH_DECISION = make_session(
 
 
 # --- Tests ---
+
 
 class TestFmtTime:
     def test_valid_iso(self):

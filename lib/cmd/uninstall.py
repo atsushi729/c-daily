@@ -19,11 +19,10 @@ def run(log_dir: Path) -> None:
     print("Uninstalling c-daily...")
 
     # Unregister launchd (macOS only)
-    if platform.system() == "Darwin":
-        if LAUNCHD_PLIST_PATH.exists():
-            subprocess.run(["launchctl", "unload", str(LAUNCHD_PLIST_PATH)], capture_output=True)
-            LAUNCHD_PLIST_PATH.unlink()
-            print("✅ launchd unregistered")
+    if platform.system() == "Darwin" and LAUNCHD_PLIST_PATH.exists():
+        subprocess.run(["launchctl", "unload", str(LAUNCHD_PLIST_PATH)], capture_output=True)
+        LAUNCHD_PLIST_PATH.unlink()
+        print("✅ launchd unregistered")
 
     # Remove hook scripts
     scripts_dir = log_dir / "scripts"

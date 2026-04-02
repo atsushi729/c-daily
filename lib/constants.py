@@ -4,6 +4,7 @@ constants.py — shared constants for c-daily.
 All magic numbers, string literals, and path definitions that are referenced
 from more than one module belong here.
 """
+
 from __future__ import annotations
 
 import sys
@@ -27,9 +28,7 @@ DEFAULT_LOG_DIR = Path.home() / ".daily-logs"
 # macOS launchd
 # ---------------------------------------------------------------------------
 LAUNCHD_LABEL = "com.c-daily.aggregate"
-LAUNCHD_PLIST_PATH = (
-    Path.home() / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist"
-)
+LAUNCHD_PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist"
 LAUNCHD_HOUR = 23
 LAUNCHD_MINUTE = 58
 
@@ -38,12 +37,23 @@ LAUNCHD_MINUTE = 58
 # Segments stripped when converting encoded dir names to human-readable names,
 # e.g. "-Users-foo-Desktop-myapp" → "myapp"
 # ---------------------------------------------------------------------------
-SKIP_PATH_SEGMENTS: frozenset[str] = frozenset({
-    "desktop", "documents", "downloads",
-    "src", "work", "projects",
-    "home", "users",
-    "code", "dev", "repos", "github", "workspace",
-})
+SKIP_PATH_SEGMENTS: frozenset[str] = frozenset(
+    {
+        "desktop",
+        "documents",
+        "downloads",
+        "src",
+        "work",
+        "projects",
+        "home",
+        "users",
+        "code",
+        "dev",
+        "repos",
+        "github",
+        "workspace",
+    }
+)
 
 # ---------------------------------------------------------------------------
 # Anthropic API
@@ -59,13 +69,13 @@ SUMMARY_MAX_MESSAGES = 40  # max message lines fed to summarization prompt
 # ---------------------------------------------------------------------------
 # Claude Sonnet 4.6 pricing
 # ---------------------------------------------------------------------------
-INPUT_COST_PER_TOKEN: float = 3.0 / 1_000_000   # $3 per million input tokens
+INPUT_COST_PER_TOKEN: float = 3.0 / 1_000_000  # $3 per million input tokens
 OUTPUT_COST_PER_TOKEN: float = 15.0 / 1_000_000  # $15 per million output tokens
 
 # ---------------------------------------------------------------------------
 # Display / truncation limits
 # ---------------------------------------------------------------------------
-FIRST_MSG_PREVIEW_LEN = 100   # max characters in first-message preview
+FIRST_MSG_PREVIEW_LEN = 100  # max characters in first-message preview
 TOOL_INPUT_PREVIEW_LEN = 150  # max chars for inline tool input display
 TOOL_RESULT_PREVIEW_LEN = 300  # max chars for inline tool result display
 

@@ -5,6 +5,7 @@ Usage:
   c-daily tui            Browse all sessions
   c-daily tui [DATE]     Start with sessions filtered to DATE (YYYY-MM-DD)
 """
+
 import sys
 from pathlib import Path
 
@@ -27,4 +28,5 @@ def run(lib_dir: Path, log_dir: Path) -> None:
         sys.path.insert(0, str(lib_dir))
 
     from tui import run_tui
+
     run_tui(log_dir=log_dir, date_filter=date_filter)
