@@ -55,6 +55,8 @@ CP_USER = 5  # user message label
 CP_ASSISTANT = 6  # assistant message label
 CP_TOOL = 7  # tool call/result
 CP_BORDER = 8  # pane separators and borders
+CP_USER_TEXT = 9   # user message body text
+CP_ASST_TEXT = 10  # assistant message body text
 
 LEFT_MIN = 28  # minimum left pane width
 LEFT_MAX = 45  # maximum left pane width
@@ -70,10 +72,12 @@ def _init_colors() -> bool:
         curses.init_pair(CP_STATUSBAR, curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(CP_SELECTED, curses.COLOR_BLACK, curses.COLOR_CYAN)
         curses.init_pair(CP_DIM, curses.COLOR_WHITE, -1)
-        curses.init_pair(CP_USER, curses.COLOR_CYAN, -1)
-        curses.init_pair(CP_ASSISTANT, curses.COLOR_GREEN, -1)
+        curses.init_pair(CP_USER, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        curses.init_pair(CP_ASSISTANT, curses.COLOR_BLACK, curses.COLOR_GREEN)
         curses.init_pair(CP_TOOL, curses.COLOR_YELLOW, -1)
         curses.init_pair(CP_BORDER, curses.COLOR_WHITE, -1)
+        curses.init_pair(CP_USER_TEXT, curses.COLOR_CYAN, -1)
+        curses.init_pair(CP_ASST_TEXT, curses.COLOR_WHITE, -1)
         return True
     except Exception:
         return False
@@ -189,18 +193,32 @@ def _render_messages(messages: list[MessageRecord], pane_width: int) -> list[_Re
 
     for msg in messages:
         if msg.role == "user":
-            add("You", _cp(CP_USER) | curses.A_BOLD)
+            label_attr = _cp(CP_USER) | curses.A_BOLD
+            text_attr = _cp(CP_USER_TEXT)
+            label_core = " You "
+            show_label = True
+        elif msg.role == "assistant":
+            label_attr = _cp(CP_ASSISTANT) | curses.A_BOLD
+            text_attr = _cp(CP_ASST_TEXT)
+            label_core = " Claude "
+            show_label = True
         else:
-            add("Claude", _cp(CP_ASSISTANT) | curses.A_BOLD)
+            text_attr = _cp(CP_DIM)
+            show_label = False
 
-        for line in _wrap_text(msg.content, text_width, indent=2):
+        if show_label:
+            # Pad to pane width so the background color fills the entire row
+            label = label_core + " " * max(0, pane_width - len(label_core) - 1)
+            add(label, label_attr)
+
+        for line in _wrap_text(msg.content, text_width - 2, indent=0):
             stripped = line.lstrip()
             if stripped.startswith("[Tool:"):
-                add("  " + stripped, _cp(CP_TOOL))
+                add("│ " + stripped, _cp(CP_TOOL))
             elif stripped.startswith("[Result]"):
-                add("  " + stripped, _cp(CP_DIM))
+                add("│ " + stripped, _cp(CP_DIM))
             else:
-                add("  " + line, _cp(CP_NORMAL))
+                add("│ " + line, text_attr)
         add("", _cp(CP_NORMAL))  # blank line between messages
 
     return result

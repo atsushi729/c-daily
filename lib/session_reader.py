@@ -182,6 +182,38 @@ def _build_session_meta(
     )
 
 
+# XML-like tags injected by Claude Code harness — not real user input
+_SYSTEM_TAG_PREFIXES = (
+    "<local-command-caveat>",
+    "<command-name>",
+    "<command-message>",
+    "<command-args>",
+    "<local-command-stdout>",
+    "<system-reminder>",
+    "<user-prompt-submit-hook>",
+)
+
+
+def _is_system_text(text: str) -> bool:
+    """Return True if the text is a harness-injected system block, not real user input."""
+    stripped = text.strip()
+    return any(stripped.startswith(tag) for tag in _SYSTEM_TAG_PREFIXES)
+
+
+def _has_user_text(content: str | list[Any]) -> bool:
+    """Return True if content contains at least one non-empty real user text block."""
+    if isinstance(content, str):
+        return bool(content.strip()) and not _is_system_text(content)
+    if isinstance(content, list):
+        for b in content:
+            if not isinstance(b, dict) or b.get("type") != "text":
+                continue
+            t = b.get("text", "")
+            if t.strip() and not _is_system_text(t):
+                return True
+    return False
+
+
 def _build_messages(records: list[dict[str, Any]]) -> list[MessageRecord]:
     """Extract MessageRecord list from pre-parsed records (no file I/O)."""
     messages: list[MessageRecord] = []
@@ -197,7 +229,13 @@ def _build_messages(records: list[dict[str, Any]]) -> list[MessageRecord]:
         text = _extract_text(content)
         if not text:
             continue
-        messages.append(MessageRecord(role=rec_type, content=text, timestamp=ts))
+        # User records that contain only tool_result blocks (no text) are tool
+        # responses fed back to the model, not actual user input.
+        if rec_type == "user" and not _has_user_text(content):
+            role = "tool_result"
+        else:
+            role = rec_type
+        messages.append(MessageRecord(role=role, content=text, timestamp=ts))
     return messages
 
 
