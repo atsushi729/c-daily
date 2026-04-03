@@ -364,7 +364,8 @@ class TUI:
             row = i + 1  # row 0 is header
 
             cursor = "> " if idx == self.selected else "  "
-            proj = truncate_to_width(s.project_name, proj_w)
+            title = s.first_msg or s.project_name
+            proj = truncate_to_width(title, proj_w)
             proj_pad = proj + " " * max(0, proj_w - display_width(proj))
             line = f"{cursor}{proj_pad} {s.fmt_start()} {s.turns:3d}t"
             line = truncate_to_width(line, left_w - 1)
@@ -394,7 +395,8 @@ class TUI:
         s = self.filtered[self.selected]
 
         header_rows = 3
-        h1 = f" {s.project_name} — {s.fmt_date()} {s.fmt_start()}"
+        session_title = s.first_msg or s.project_name
+        h1 = f" {session_title} — {s.fmt_date()} {s.fmt_start()}"
         h2 = f" Turns: {s.turns}  Tokens: {_fmt_tokens(s.total_tokens)}  ${s.cost_usd:.4f}"
         sep = " " + "-" * max(0, right_w - 2)
 
