@@ -176,7 +176,6 @@ class _RenderLine:
         self.attr = attr
 
 
-
 def _render_messages(messages: list[MessageRecord], pane_width: int) -> list[_RenderLine]:
     """
     Convert a list of MessageRecord objects into a flat list of _RenderLine,
@@ -698,9 +697,7 @@ class ProjectTUI:
             stdscr, f" c-daily TUI — Projects — {today}  [{len(self.projects)} projects]", cols
         )
 
-    def _draw_project_list(
-        self, stdscr: curses.window, content_rows: int, left_w: int
-    ) -> None:
+    def _draw_project_list(self, stdscr: curses.window, content_rows: int, left_w: int) -> None:
         if not self.projects:
             _safe_addstr(stdscr, 2, 1, "No projects found", _cp(CP_DIM))
             return
@@ -726,11 +723,7 @@ class ProjectTUI:
             name_pad = name + " " * max(0, name_w - display_width(name))
             line = f"{cursor}{name_pad} {p.session_count:3d}s ${p.cost_usd:.3f}"
             line = truncate_to_width(line, left_w - 1)
-            attr = (
-                _cp(CP_SELECTED) | curses.A_BOLD
-                if idx == self.selected
-                else _cp(CP_NORMAL)
-            )
+            attr = _cp(CP_SELECTED) | curses.A_BOLD if idx == self.selected else _cp(CP_NORMAL)
             _safe_addstr(stdscr, row, 0, line, attr)
 
     def _draw_session_list(
@@ -888,9 +881,7 @@ class DailyTUI:
             cols,
         )
 
-    def _draw_file_list(
-        self, stdscr: curses.window, content_rows: int, left_w: int
-    ) -> None:
+    def _draw_file_list(self, stdscr: curses.window, content_rows: int, left_w: int) -> None:
         if not self.files:
             _safe_addstr(stdscr, 2, 1, "No daily logs found", _cp(CP_DIM))
             return
@@ -956,9 +947,7 @@ class DailyTUI:
                 attr = _cp(CP_DIM)
             else:
                 attr = _cp(CP_NORMAL)
-            _safe_addstr(
-                stdscr, 1 + i, right_x, truncate_to_width(" " + line, right_w - 1), attr
-            )
+            _safe_addstr(stdscr, 1 + i, right_x, truncate_to_width(" " + line, right_w - 1), attr)
 
         if total > available and max_scroll:
             pct = int(self.content_scroll / max_scroll * 100)

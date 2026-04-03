@@ -55,7 +55,6 @@ def decode_project_name(encoded: str) -> str:
     return parts[-1] if parts else encoded
 
 
-
 def _extract_text(content: str | list[Any], plain_only: bool = False) -> str:
     """Extract text from a message content value (str or list of blocks).
 
