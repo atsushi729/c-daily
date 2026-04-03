@@ -37,10 +37,9 @@ def run(lib_dir: Path, log_dir: Path) -> None:
 
     else:
         # "session" subcommand, or legacy bare date argument (e.g. c-daily tui 2026-04-01)
-        if subcmd == "session":
-            date_filter = args[1] if len(args) > 1 else None
-        else:
-            date_filter = subcmd  # backward compat
+        date_filter = (
+            (args[1] if len(args) > 1 else None) if subcmd == "session" else subcmd
+        )  # backward compat
         if date_filter is not None:
             validate_date(date_filter)
 

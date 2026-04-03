@@ -606,8 +606,8 @@ class ProjectTUI:
     Enter: exits and signals the caller to open a session browser for that project.
     """
 
-    def __init__(self, sessions: list):
-        grouped: dict[str, list] = {}
+    def __init__(self, sessions: list[SessionMeta]):
+        grouped: dict[str, list[SessionMeta]] = {}
         for s in sessions:
             grouped.setdefault(s.project_name, []).append(s)
 
@@ -634,7 +634,7 @@ class ProjectTUI:
         self.scroll = 0
         self._selected_project: ProjectItem | None = None
 
-    def run(self) -> "ProjectItem | None":
+    def run(self) -> ProjectItem | None:
         curses.wrapper(self._main)
         return self._selected_project
 
@@ -675,10 +675,9 @@ class ProjectTUI:
                 self.selected = max(0, self.selected - (rows - 3))
             elif key == curses.KEY_NPAGE:
                 self.selected = min(len(self.projects) - 1, self.selected + (rows - 3))
-            elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
-                if self.projects:
-                    self._selected_project = self.projects[self.selected]
-                    break
+            elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")) and self.projects:
+                self._selected_project = self.projects[self.selected]
+                break
 
     def _draw(self, stdscr: curses.window, rows: int, cols: int, left_w: int) -> None:
         content_rows = rows - 2
