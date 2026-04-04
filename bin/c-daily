@@ -29,6 +29,7 @@ Usage:
   c-daily tui project        Browse projects; Enter opens session browser for selected project
   c-daily tui daily          Browse daily summaries
   c-daily tui [DATE]         Shorthand for tui session [DATE]
+  c-daily web [--port PORT]  Open insights web UI (default port: 8765)
   c-daily status             Check hook and launchd status
   c-daily raw [DATE]         Display raw log (JSONL)
   c-daily uninstall          Remove all settings
@@ -79,6 +80,9 @@ def main() -> None:
 
     elif cmd == "tui":
         _run_module("tui")
+
+    elif cmd == "web":
+        _run_module("web")
 
     elif cmd == "status":
         import importlib.util
