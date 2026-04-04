@@ -470,6 +470,8 @@ class TUI:
             bar = f" / {self.filter_text}_"
         elif self._status_msg:
             bar = f" {self._status_msg}"
+        elif self.focus == "msg":
+            bar = " [q]quit  [j/k]scroll  [Esc/Tab]back to list  [/]filter  [r]reload  [d]summary"
         else:
             bar = " [q]quit  [j/k]move  [Tab]pane  [Enter]open  [/]filter  [r]reload  [d]summary"
         _draw_statusbar_line(stdscr, row, cols, bar)
@@ -771,7 +773,7 @@ class ProjectTUI:
 
     def _draw_statusbar(self, stdscr: curses.window, row: int, cols: int) -> None:
         _draw_statusbar_line(
-            stdscr, row, cols, " [q]quit  [j/k]move  [Enter]open sessions  [g/G]top/bottom"
+            stdscr, row, cols, " [q]quit  [j/k]move  [Enter]open sessions  [g/G]top/bottom  (session browser: [q]back here)"
         )
 
 
@@ -1021,14 +1023,19 @@ def run_tui_project(log_dir: Path) -> None:
     print(f"\r{' ' * 20}\r", end="", flush=True)
 
     ptui = ProjectTUI(sessions=sessions)
-    selected = None
-    with contextlib.suppress(KeyboardInterrupt):
-        selected = ptui.run()
+    while True:
+        ptui._selected_project = None
+        selected = None
+        with contextlib.suppress(KeyboardInterrupt):
+            selected = ptui.run()
 
-    if selected is not None:
+        if selected is None:
+            break
+
         app = TUI(sessions=selected.sessions, log_dir=log_dir)
         with contextlib.suppress(KeyboardInterrupt):
             app.run()
+        # After session browser exits, loop back to project browser
 
 
 def run_tui_daily(log_dir: Path) -> None:
