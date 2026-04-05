@@ -171,43 +171,50 @@ section h2 {
 .session-meta span { color: var(--muted); }
 .session-meta span strong { color: var(--text); }
 
-.messages { display: flex; flex-direction: column; gap: 12px; }
+.messages { display: flex; flex-direction: column; gap: 18px; padding: 8px 0; }
 
-.msg { border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
-.msg-header {
-  padding: 5px 14px;
+.msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 72%;
+}
+.msg.user      { align-self: flex-end;   align-items: flex-end; }
+.msg.assistant { align-self: flex-start; align-items: flex-start; }
+
+.msg-meta {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   display: flex;
-  justify-content: space-between;
+  gap: 8px;
   align-items: center;
+  margin-bottom: 5px;
 }
-.msg-header .ts { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.7; }
-.msg-body {
-  padding: 12px 14px;
+.msg-meta .ts { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.6; }
+
+.msg.user      .msg-meta { color: var(--accent); }
+.msg.assistant .msg-meta { color: var(--green); }
+
+.msg-bubble {
+  padding: 10px 14px;
   font-size: 13px;
   line-height: 1.75;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-x: auto;
+  color: var(--text);
 }
 
-.msg.user .msg-header   { background: #1c2533; color: var(--accent); }
-.msg.user .msg-body     { background: var(--surface); color: var(--text); }
-
-.msg.assistant .msg-header { background: #12261e; color: var(--green); }
-.msg.assistant .msg-body   { background: var(--surface); color: var(--text); }
-
-.msg.tool_result .msg-header { background: #1e1e1e; color: var(--muted); }
-.msg.tool_result .msg-body   {
-  background: #111;
-  color: #6e7681;
-  font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, monospace;
-  max-height: 200px;
-  overflow-y: auto;
+.msg.user .msg-bubble {
+  background: #1a2d4a;
+  border-radius: 14px 14px 4px 14px;
+  border: 1px solid #2a4a6e;
+}
+.msg.assistant .msg-bubble {
+  background: var(--surface);
+  border-radius: 14px 14px 14px 4px;
+  border: 1px solid var(--border);
 }
 """
 
@@ -470,8 +477,8 @@ def session_html(project_name: str, meta: "Any") -> str:
         body = _html_lib.escape(msg.content)
         msg_blocks.append(
             f'<div class="msg {role}">'
-            f'<div class="msg-header"><span>{label}</span>{ts_html}</div>'
-            f'<div class="msg-body">{body}</div>'
+            f'<div class="msg-meta"><span>{label}</span>{ts_html}</div>'
+            f'<div class="msg-bubble">{body}</div>'
             f'</div>'
         )
 
