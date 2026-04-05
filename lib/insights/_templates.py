@@ -74,7 +74,7 @@ section h2 {
 }
 
 /* Calendar heatmap */
-.calendar-wrap { overflow-x: auto; }
+.calendar-wrap { overflow-x: visible; }
 .calendar {
   display: inline-grid;
   grid-template-rows: repeat(7, 11px);
