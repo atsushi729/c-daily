@@ -15,7 +15,7 @@ if str(_LIB_DIR) not in sys.path:
 from constants import CLAUDE_SETTINGS_FILE, LAUNCHD_PLIST_PATH  # noqa: E402
 
 
-def run(log_dir: Path) -> None:
+def run(_lib_dir: Path, log_dir: Path) -> None:
     print("Uninstalling c-daily...")
 
     # Unregister launchd (macOS only)
@@ -47,4 +47,4 @@ def run(log_dir: Path) -> None:
 
 if __name__ == "__main__":
     log_dir = Path(os.environ.get("C_DAILY_LOG_DIR", Path.home() / ".daily-logs"))
-    run(log_dir)
+    run(Path(), log_dir)

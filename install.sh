@@ -44,11 +44,12 @@ else
   ok "Download complete"
 fi
 
-# --- Add bin/c-daily to PATH ---
+# --- Add bin/c-daily to PATH, plus short `dl` alias ---
 mkdir -p "$BIN_DIR"
 ln -sf "$INSTALL_DIR/bin/c-daily" "$BIN_DIR/c-daily"
+ln -sf "$INSTALL_DIR/bin/c-daily" "$BIN_DIR/dl"
 chmod +x "$INSTALL_DIR/bin/c-daily"
-ok "Linked c-daily command to $BIN_DIR"
+ok "Linked c-daily / dl commands to $BIN_DIR"
 
 # --- Configure PATH (if not already set) ---
 SHELL_RC=""
@@ -72,8 +73,10 @@ echo ""
 echo -e "${BOLD}🎉 Installation complete!${RESET}"
 echo ""
 echo "Next steps:"
-echo -e "  ${BOLD}c-daily install${RESET}   Set up Claude Code hooks and launchd"
-echo -e "  ${BOLD}c-daily today${RESET}     Test log generation"
-echo -e "  ${BOLD}c-daily help${RESET}      Show all commands"
+echo -e "  ${BOLD}dl install${RESET}   Set up Claude Code hooks and launchd"
+echo -e "  ${BOLD}dl today${RESET}     Test log generation"
+echo -e "  ${BOLD}dl help${RESET}      Show all commands"
+echo ""
+echo "(c-daily also works)"
 echo ""
 echo "Documentation: $REPO"

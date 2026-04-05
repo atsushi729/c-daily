@@ -128,12 +128,22 @@ def run(lib_dir: Path, log_dir: Path) -> None:
         subprocess.run(["launchctl", "load", str(LAUNCHD_PLIST_PATH)], check=True)
         print(f"✅ launchd registered (auto-run daily at {LAUNCHD_HOUR:02d}:{LAUNCHD_MINUTE:02d})")
 
+    this_bin = Path(sys.argv[0]).resolve()
+    dl_link = this_bin.parent / "dl"
+    try:
+        dl_link.unlink(missing_ok=True)
+        dl_link.symlink_to(this_bin)
+        print(f"✅ Short alias `dl` linked at {dl_link}")
+    except OSError as e:
+        print(f"⚠️  Could not create `dl` alias: {e}")
+
     # --- Done ---
     print()
     print("Setup complete!")
     print()
-    print("  c-daily today    → generate today's log now")
-    print("  c-daily status   → check status")
+    print("  dl today    → generate today's log now")
+    print("  dl status   → check status")
+    print("  (c-daily also works)")
 
 
 if __name__ == "__main__":

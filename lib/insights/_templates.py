@@ -455,6 +455,8 @@ def session_html(project_name: str, meta: "Any") -> str:
     msg_blocks: list[str] = []
     for msg in meta.messages:
         role = msg.role
+        if role == "tool_result":
+            continue
         label = _ROLE_LABELS.get(role, role)
         ts_str = ""
         if msg.timestamp:

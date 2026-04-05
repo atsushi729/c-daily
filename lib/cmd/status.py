@@ -21,7 +21,7 @@ from constants import (  # noqa: E402
 _MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
-def run(log_dir: Path) -> None:
+def run(_lib_dir: Path, log_dir: Path) -> None:
     today = date.today().isoformat()
     raw_file = log_dir / "raw" / f"{today}.jsonl"
 
@@ -66,7 +66,7 @@ def run(log_dir: Path) -> None:
 
     # Log directory
     print(f"📁 Log directory     : {log_dir}")
-    md_count = len(list(log_dir.glob("*.md")))
+    md_count = sum(1 for _ in log_dir.glob("*.md"))
     print(f"📄 Generated Markdown: {md_count} files")
 
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -74,4 +74,4 @@ def run(log_dir: Path) -> None:
 
 if __name__ == "__main__":
     log_dir = Path(os.environ.get("C_DAILY_LOG_DIR", Path.home() / ".daily-logs"))
-    run(log_dir)
+    run(Path(), log_dir)

@@ -17,24 +17,31 @@ if str(C_DAILY_LIB) not in sys.path:
 
 from constants import VERSION, validate_date  # noqa: E402
 
+_PROG = Path(sys.argv[0]).name
+
 
 def usage() -> None:
-    print(f"""c-daily v{VERSION} — Claude Code daily log auto-generator
+    prog = _PROG
+    print(f"""{prog} v{VERSION} — Claude Code daily log auto-generator
 
 Usage:
-  c-daily install            Set up Claude Code hooks and launchd
-  c-daily today              Generate and open today's log
-  c-daily show [DATE]        Generate and open log for a specific date (e.g. 2026-03-22)
-  c-daily tui session [DATE] Browse sessions (optional date filter YYYY-MM-DD)
-  c-daily tui project        Browse projects; Enter opens session browser for selected project
-  c-daily tui daily          Browse daily summaries
-  c-daily tui [DATE]         Shorthand for tui session [DATE]
-  c-daily web [--port PORT]  Open insights web UI (default port: 8765)
-  c-daily status             Check hook and launchd status
-  c-daily raw [DATE]         Display raw log (JSONL)
-  c-daily uninstall          Remove all settings
-  c-daily version            Show version
-  c-daily help               Show this help
+  {prog} install            Set up Claude Code hooks and launchd
+  {prog} today              Generate and open today's log
+  {prog} show [DATE]        Generate and open log for a specific date (e.g. 2026-03-22)
+  {prog} tui session [DATE] Browse sessions (optional date filter YYYY-MM-DD)
+  {prog} tui project        Browse projects; Enter opens session browser for selected project
+  {prog} tui daily          Browse daily summaries
+  {prog} tui [DATE]         Shorthand for tui session [DATE]
+  {prog} web [--port PORT]  Open insights web UI (default port: 8765)
+  {prog} status             Check hook and launchd status
+  {prog} raw [DATE]         Display raw log (JSONL)
+  {prog} uninstall          Remove all settings
+  {prog} version            Show version
+  {prog} help               Show this help
+
+Short aliases (slash-style also accepted, e.g. /tui):
+  t, /tui                    → tui session
+  w, /web                    → web
 
 Environment variables:
   C_DAILY_LOG_DIR   Log storage directory (default: ~/.daily-logs)
@@ -57,8 +64,16 @@ def _run_module(name: str) -> None:
     mod.run(C_DAILY_LIB, C_DAILY_LOG_DIR)
 
 
+_ALIASES: dict[str, str] = {
+    alias: cmd
+    for cmd, short in [("tui", "t"), ("web", "w")]
+    for alias in (short, f"/{short}", f"/{cmd}")
+}
+
+
 def main() -> None:
     cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
+    cmd = _ALIASES.get(cmd, cmd)
     args = sys.argv[2:]
 
     if cmd == "install":
@@ -85,11 +100,7 @@ def main() -> None:
         _run_module("web")
 
     elif cmd == "status":
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("status", C_DAILY_LIB / "cmd" / "status.py")
-        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-        spec.loader.exec_module(mod)  # type: ignore[union-attr]
-        mod.run(C_DAILY_LOG_DIR)
+        _run_module("status")
 
     elif cmd == "raw":
         target_date = args[0] if args else str(date.today())
@@ -102,14 +113,10 @@ def main() -> None:
             sys.exit(1)
 
     elif cmd == "uninstall":
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("uninstall", C_DAILY_LIB / "cmd" / "uninstall.py")
-        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-        spec.loader.exec_module(mod)  # type: ignore[union-attr]
-        mod.run(C_DAILY_LOG_DIR)
+        _run_module("uninstall")
 
     elif cmd == "version":
-        print(f"c-daily v{VERSION}")
+        print(f"{_PROG} v{VERSION}")
 
     elif cmd in ("help", "--help", "-h"):
         usage()
