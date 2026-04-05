@@ -14,6 +14,8 @@ which fires another Stop hook when it finishes → infinite recursion.
 A plain HTTP call to the API has no hook awareness, so it is safe.
 """
 
+from __future__ import annotations
+
 import contextlib
 import fcntl
 import json

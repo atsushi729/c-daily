@@ -3,6 +3,8 @@
 aggregate.py — JSONL raw log → daily Markdown generator.
 """
 
+from __future__ import annotations
+
 import os
 import sys
 from datetime import date, datetime
