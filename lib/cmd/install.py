@@ -54,6 +54,7 @@ def run(lib_dir: Path, log_dir: Path) -> None:
     hook_dst = hooks_dir / "session_summary.py"
     shutil.copy2(hook_src, hook_dst)
     hook_dst.chmod(0o700)
+    shutil.copy2(lib_dir / "text_utils.py", hooks_dir / "text_utils.py")
     shutil.copy2(lib_dir / "aggregate.py", log_dir / "scripts" / "aggregate.py")
     print("✅ Hook scripts copied")
 

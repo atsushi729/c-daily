@@ -20,12 +20,15 @@ import contextlib
 import fcntl
 import json
 import os
-import re
 import sys
 import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+# text_utils.py is deployed alongside this script by `c-daily install`
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from text_utils import strip_system_blocks  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Local constants (mirrors lib/constants.py — update both when changing)
@@ -112,13 +115,16 @@ for entry in transcript_entries:
     content = msg_obj.get("content", "") if msg_obj else entry.get("content", "")
 
     if role == "user" and not first_msg:
+        text = ""
         if isinstance(content, list):
             for block in content:
                 if isinstance(block, dict) and block.get("type") == "text":
-                    first_msg = block["text"][:_FIRST_MSG_PREVIEW_LEN]
+                    text = block.get("text", "")
                     break
         elif isinstance(content, str):
-            first_msg = content[:_FIRST_MSG_PREVIEW_LEN]
+            text = content
+        if text:
+            first_msg = strip_system_blocks(text)[:_FIRST_MSG_PREVIEW_LEN]
 
     if role in ("assistant", "user"):
         turns += 1

@@ -29,6 +29,7 @@ from constants import (  # noqa: E402
     TOOL_RESULT_PREVIEW_LEN,
 )
 from models import MessageRecord, SessionMeta  # noqa: E402
+from text_utils import strip_system_blocks  # noqa: E402
 
 __all__ = [
     "MessageRecord",
@@ -144,7 +145,9 @@ def _build_session_meta(
             if not isinstance(msg, dict):
                 continue
             if not first_msg:
-                text = _extract_text(msg.get("content", ""), plain_only=True)
+                text = strip_system_blocks(
+                    _extract_text(msg.get("content", ""), plain_only=True)
+                )
                 if text:
                     first_msg = text[:FIRST_MSG_PREVIEW_LEN]
 
