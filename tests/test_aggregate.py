@@ -4,14 +4,11 @@ Unit tests for aggregate.py
 """
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 
-# Add lib/ to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
-from aggregate import build_md, fmt_time, fmt_tokens
-from session_reader import load_jsonl
+from cdl.aggregate import build_md, fmt_time, fmt_tokens
+from cdl.session_reader import load_jsonl
 
 # --- Fixtures ---
 
