@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import contextlib
 import curses
+import json
 import platform
 import subprocess
 import sys
@@ -38,10 +39,12 @@ _LIB_DIR = Path(__file__).resolve().parent
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from constants import CLAUDE_PROJECTS_DIR  # noqa: E402
+from constants import CLAUDE_PROJECTS_DIR, TOOL_INPUT_PREVIEW_LEN  # noqa: E402
 from models import MessageRecord, ProjectItem, SessionMeta  # noqa: E402
+from diff_utils import _make_diff  # noqa: E402
 from session_reader import (  # noqa: E402
-    load_session_messages,
+    _is_system_text,
+    load_jsonl,
     load_sessions,
 )
 
@@ -57,6 +60,9 @@ CP_TOOL = 7  # tool call/result
 CP_BORDER = 8  # pane separators and borders
 CP_USER_TEXT = 9   # user message body text
 CP_ASST_TEXT = 10  # assistant message body text
+CP_DIFF_ADD = 11   # diff added lines
+CP_DIFF_REM = 12   # diff removed lines
+CP_DIFF_HDR = 13   # diff hunk header
 
 LEFT_MIN = 28  # minimum left pane width
 LEFT_MAX = 45  # maximum left pane width
@@ -78,6 +84,9 @@ def _init_colors() -> bool:
         curses.init_pair(CP_BORDER, curses.COLOR_WHITE, -1)
         curses.init_pair(CP_USER_TEXT, curses.COLOR_CYAN, -1)
         curses.init_pair(CP_ASST_TEXT, curses.COLOR_WHITE, -1)
+        curses.init_pair(CP_DIFF_ADD, curses.COLOR_BLACK, curses.COLOR_GREEN)
+        curses.init_pair(CP_DIFF_REM, curses.COLOR_WHITE, curses.COLOR_RED)
+        curses.init_pair(CP_DIFF_HDR, curses.COLOR_CYAN, -1)
         return True
     except Exception:
         return False
@@ -220,6 +229,117 @@ def _render_messages(messages: list[MessageRecord], pane_width: int) -> list[_Re
             else:
                 add("│ " + line, text_attr)
         add("", _cp(CP_NORMAL))  # blank line between messages
+
+    return result
+
+
+def _render_messages_with_diffs(records: list[dict], pane_width: int) -> list[_RenderLine]:
+    """Render session records with Edit/Write diffs shown inline in the conversation."""
+    result: list[_RenderLine] = []
+    text_w = max(pane_width - 2, 10)
+
+    def add(text: str, attr: int) -> None:
+        result.append(_RenderLine(text, attr))
+
+    for rec in records:
+        rec_type = rec.get("type", "")
+        if rec_type not in ("user", "assistant"):
+            continue
+        msg = rec.get("message", {})
+        if not isinstance(msg, dict):
+            continue
+        content = msg.get("content", "")
+
+        if rec_type == "user":
+            user_texts: list[str] = []
+            if isinstance(content, str):
+                if content.strip() and not _is_system_text(content):
+                    user_texts.append(content.strip())
+            elif isinstance(content, list):
+                for block in content:
+                    if not isinstance(block, dict) or block.get("type") != "text":
+                        continue
+                    t = block.get("text", "").strip()
+                    if t and not _is_system_text(t):
+                        user_texts.append(t)
+            if not user_texts:
+                continue
+            you_core = " You "
+            label = you_core + " " * max(0, pane_width - len(you_core) - 1)
+            add(label, _cp(CP_USER) | curses.A_BOLD)
+            for text in user_texts:
+                for line in _wrap_text(text, text_w - 2):
+                    add("│ " + line, _cp(CP_USER_TEXT))
+            add("", _cp(CP_NORMAL))
+
+        elif rec_type == "assistant":
+            claude_core = " Claude "
+            if not isinstance(content, list):
+                if isinstance(content, str) and content.strip():
+                    label = claude_core + " " * max(0, pane_width - len(claude_core) - 1)
+                    add(label, _cp(CP_ASSISTANT) | curses.A_BOLD)
+                    for line in _wrap_text(content.strip(), text_w - 2):
+                        add("│ " + line, _cp(CP_ASST_TEXT))
+                    add("", _cp(CP_NORMAL))
+                continue
+
+            has_visible = any(
+                isinstance(b, dict) and b.get("type") in ("text", "tool_use")
+                for b in content
+            )
+            if not has_visible:
+                continue
+
+            label = claude_core + " " * max(0, pane_width - len(claude_core) - 1)
+            add(label, _cp(CP_ASSISTANT) | curses.A_BOLD)
+
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                btype = block.get("type", "")
+
+                if btype == "text":
+                    text = block.get("text", "").strip()
+                    if text:
+                        for line in _wrap_text(text, text_w - 2):
+                            add("│ " + line, _cp(CP_ASST_TEXT))
+
+                elif btype == "tool_use":
+                    name = block.get("name", "tool")
+                    inp = block.get("input", {}) or {}
+                    if name in ("Edit", "Write"):
+                        file_path = inp.get("file_path", "?")
+                        add(f"│ \u25cf {name}({file_path})", _cp(CP_TOOL) | curses.A_BOLD)
+                        if name == "Edit":
+                            old_lines = inp.get("old_string", "").splitlines()
+                            new_lines = inp.get("new_string", "").splitlines()
+                        else:
+                            old_lines = []
+                            new_lines = inp.get("content", "").splitlines()
+                        diff_lines = _make_diff(old_lines, new_lines)
+                        n_add = sum(1 for d in diff_lines if d["type"] == "added")
+                        n_rem = sum(1 for d in diff_lines if d["type"] == "removed")
+                        add(f"│   Added {n_add} lines, removed {n_rem} lines", _cp(CP_DIM))
+                        for dl in diff_lines:
+                            dtype = dl["type"]
+                            text = dl["text"]
+                            if dtype == "header":
+                                continue
+                            elif dtype == "hunk":
+                                add("│ " + truncate_to_width(text, text_w - 2), _cp(CP_DIFF_HDR))
+                            elif dtype == "added":
+                                add("│+" + truncate_to_width(text, text_w - 1), _cp(CP_DIFF_ADD))
+                            elif dtype == "removed":
+                                add("│-" + truncate_to_width(text, text_w - 1), _cp(CP_DIFF_REM))
+                            else:
+                                add("│ " + truncate_to_width(text, text_w - 2), _cp(CP_NORMAL))
+                    else:
+                        inp_str = json.dumps(inp, ensure_ascii=False)
+                        if len(inp_str) > TOOL_INPUT_PREVIEW_LEN:
+                            inp_str = inp_str[:TOOL_INPUT_PREVIEW_LEN] + "..."
+                        add("│ " + truncate_to_width(f"[Tool: {name}] {inp_str}", text_w - 2), _cp(CP_TOOL))
+
+            add("", _cp(CP_NORMAL))
 
     return result
 
@@ -427,14 +547,13 @@ class TUI:
 
         available_rows = content_rows - header_rows
 
-        if not s.messages_loaded:
-            _safe_addstr(
-                stdscr, header_rows + 2, right_x + 1, "Press Enter to load messages", _cp(CP_DIM)
-            )
-            return
-
         if self._rendered_for != s.session_id:
-            self._rendered = _render_messages(s.messages, right_w)
+            if not s.messages_loaded:
+                _safe_addstr(
+                    stdscr, header_rows + 2, right_x + 1, "Press Enter to load", _cp(CP_DIM)
+                )
+                return
+            self._rendered = _render_messages_with_diffs(load_jsonl(s.file_path), right_w)
             self._rendered_for = s.session_id
             self.msg_scroll = 0
 
@@ -536,12 +655,11 @@ class TUI:
         elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
             if self.filtered:
                 s = self.filtered[self.selected]
-                if not s.messages_loaded:
-                    load_session_messages(s)
-                    right_w = cols - left_w - 1
-                    self._rendered = _render_messages(s.messages, right_w)
-                    self._rendered_for = s.session_id
-                    self.msg_scroll = 0
+                right_w = cols - left_w - 1
+                self._rendered = _render_messages_with_diffs(load_jsonl(s.file_path), right_w)
+                self._rendered_for = s.session_id
+                s.messages_loaded = True
+                self.msg_scroll = 0
                 self.focus = "msg"
 
         elif key == curses.KEY_RESIZE:
@@ -602,11 +720,8 @@ class TUI:
         if not self.filtered:
             return []
         s = self.filtered[self.selected]
-        if not s.messages_loaded:
-            return []
         if self._rendered_for != s.session_id:
-            self._rendered = _render_messages(s.messages, right_w)
-            self._rendered_for = s.session_id
+            return []
         return self._rendered
 
     def _open_daily_summary(self) -> None:

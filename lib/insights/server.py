@@ -27,7 +27,7 @@ from insights.extractor import (  # noqa: E402
     activity_heatmap,
     project_detail,
     project_list,
-    session_messages,
+    session_data,
 )
 
 DEFAULT_HOST = "127.0.0.1"
@@ -49,11 +49,12 @@ class _Handler(BaseHTTPRequestHandler):
             # Route: /project/{name}/session/{session_id}
             if "/session/" in tail:
                 name, _, session_id = tail.partition("/session/")
-                meta = session_messages(name, session_id)
-                if meta is None:
+                result = session_data(name, session_id)
+                if result is None:
                     self._send_html(not_found_html(path), status=404)
                 else:
-                    self._send_html(session_html(name, meta))
+                    meta, diffs = result
+                    self._send_html(session_html(name, meta, diffs))
             # Route: /project/{name}
             else:
                 detail = project_detail(tail)

@@ -216,6 +216,66 @@ section h2 {
   border-radius: 14px 14px 14px 4px;
   border: 1px solid var(--border);
 }
+
+/* Diff view */
+.diff-list { display: flex; flex-direction: column; gap: 16px; }
+.diff-block {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+}
+.diff-file-header {
+  background: var(--surface2);
+  padding: 8px 14px;
+  color: var(--text);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.diff-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-weight: 400;
+}
+.diff-body { overflow-x: auto; }
+.diff-line {
+  padding: 1px 14px;
+  white-space: pre;
+  line-height: 1.6;
+  display: block;
+}
+.diff-line.diff-added   { background: #0d4a23; color: #56d364; }
+.diff-line.diff-removed { background: #4a0d0d; color: #f85149; }
+.diff-line.diff-hunk    { background: var(--surface2); color: var(--accent); }
+.diff-line.diff-header  { color: var(--muted); }
+.diff-line.diff-context { color: var(--text); }
+.diff-empty { color: var(--muted); font-size: 13px; padding: 16px 0; }
+
+/* Inline diff (within conversation) */
+.inline-diff {
+  align-self: flex-start;
+  max-width: 90%;
+  margin-top: -10px;
+  margin-bottom: 6px;
+}
+.diff-summary {
+  padding: 4px 14px 6px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.diff-dot   { color: var(--green); }
+.diff-tool  { color: var(--text); font-weight: 600; }
+.diff-path  { color: var(--muted); }
 """
 
 
@@ -435,10 +495,50 @@ def project_html(detail: dict[str, Any]) -> str:
 # Session detail page
 # ---------------------------------------------------------------------------
 
-def session_html(project_name: str, meta: "Any") -> str:
-    """Render a full session transcript as a chat view."""
-    from models import MessageRecord  # local import to keep this module light
+def _render_inline_diff(edit: "Any") -> str:
+    """Render a single Edit/Write operation as an inline diff block."""
+    file_path = _html_lib.escape(edit.get("file_path", ""))
+    tool = _html_lib.escape(edit.get("tool", ""))
+    diff_lines = edit.get("diff_lines", [])
 
+    n_add = sum(1 for d in diff_lines if d.get("type") == "added")
+    n_rem = sum(1 for d in diff_lines if d.get("type") == "removed")
+    summary = f"Added <strong>{n_add}</strong> lines, removed <strong>{n_rem}</strong> lines"
+
+    line_htmls: list[str] = []
+    for dl in diff_lines:
+        dtype = dl.get("type", "context")
+        if dtype == "header":
+            continue
+        text = _html_lib.escape(dl.get("text", ""))
+        if dtype == "added":
+            prefix = "+"
+            css = "diff-added"
+        elif dtype == "removed":
+            prefix = "-"
+            css = "diff-removed"
+        elif dtype == "hunk":
+            prefix = " "
+            css = "diff-hunk"
+        else:
+            prefix = " "
+            css = "diff-context"
+        line_htmls.append(f'<span class="diff-line {css}">{prefix}{text}</span>')
+
+    return (
+        f'<div class="diff-block inline-diff">'
+        f'<div class="diff-file-header">'
+        f'<span class="diff-dot">\u25cf</span> '
+        f'<span class="diff-tool">{tool}</span>(<span class="diff-path">{file_path}</span>)'
+        f'</div>'
+        f'<div class="diff-summary">{summary}</div>'
+        f'<div class="diff-body">{"".join(line_htmls)}</div>'
+        f'</div>'
+    )
+
+
+def session_html(project_name: str, meta: "Any", diffs: "list[Any] | None" = None) -> str:
+    """Render a full session transcript as a chat view with inline diffs."""
     local_dt = None
     if meta.start_time is not None:
         dt = meta.start_time
@@ -458,6 +558,13 @@ def session_html(project_name: str, meta: "Any") -> str:
         f'<span>Cost: <strong>{_fmt_cost(meta.cost_usd)}</strong></span>'
         '</div>'
     )
+
+    # Group diffs by timestamp so they can be injected inline
+    diffs_by_ts: dict[str, list[Any]] = {}
+    for d in (diffs or []):
+        ts = d.get("timestamp", "")
+        diffs_by_ts.setdefault(ts, []).append(d)
+    emitted_ts: set[str] = set()
 
     msg_blocks: list[str] = []
     for msg in meta.messages:
@@ -481,6 +588,11 @@ def session_html(project_name: str, meta: "Any") -> str:
             f'<div class="msg-bubble">{body}</div>'
             f'</div>'
         )
+
+        if role == "assistant" and msg.timestamp in diffs_by_ts and msg.timestamp not in emitted_ts:
+            for edit in diffs_by_ts[msg.timestamp]:
+                msg_blocks.append(_render_inline_diff(edit))
+            emitted_ts.add(msg.timestamp)
 
     messages_html = (
         f'<div class="messages">{"".join(msg_blocks)}</div>'

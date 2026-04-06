@@ -19,8 +19,10 @@ if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
 from constants import CLAUDE_PROJECTS_DIR  # noqa: E402
+from diff_utils import extract_edit_diffs  # noqa: E402
 from models import SessionMeta  # noqa: E402
 from session_reader import (  # noqa: E402
+    _build_messages,
     _build_session_meta,
     decode_project_name,
     load_jsonl,
@@ -239,5 +241,34 @@ def session_messages(
             return None
         load_session_messages(meta)
         return meta
+
+    return None
+
+
+def session_data(
+    project_name: str,
+    session_id: str,
+    claude_dir: Path = CLAUDE_PROJECTS_DIR,
+) -> tuple[SessionMeta, list[dict[str, Any]]] | None:
+    """Return (SessionMeta with messages, diffs) for one session in a single JSONL pass."""
+    if not claude_dir.is_dir():
+        return None
+
+    for project_path in claude_dir.iterdir():
+        if not project_path.is_dir():
+            continue
+        if decode_project_name(project_path.name).lower() != project_name.lower():
+            continue
+        jsonl_path = project_path / f"{session_id}.jsonl"
+        records = load_jsonl(jsonl_path)
+        if not records:
+            continue
+        meta = _build_session_meta(jsonl_path, records, project_name=project_name)
+        if meta is None:
+            return None
+        meta.messages = _build_messages(records)
+        meta.messages_loaded = True
+        diffs = extract_edit_diffs(records)
+        return meta, diffs
 
     return None
