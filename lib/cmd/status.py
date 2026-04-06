@@ -25,7 +25,7 @@ def run(_lib_dir: Path, log_dir: Path) -> None:
     today = date.today().isoformat()
     raw_file = log_dir / "raw" / f"{today}.jsonl"
 
-    print("📊 c-daily status")
+    print("📊 cdl status")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
     # Check Claude Code hook — single stat() call avoids TOCTOU
@@ -42,7 +42,7 @@ def run(_lib_dir: Path, log_dir: Path) -> None:
     if hook_configured:
         print("✅ Claude Code hook  : configured")
     else:
-        print("❌ Claude Code hook  : not configured (run c-daily install)")
+        print("❌ Claude Code hook  : not configured (run cdl install)")
 
     # Check launchd (macOS)
     if platform.system() == "Darwin":
@@ -51,7 +51,7 @@ def run(_lib_dir: Path, log_dir: Path) -> None:
             time_str = f"{LAUNCHD_HOUR:02d}:{LAUNCHD_MINUTE:02d}"
             print(f"✅ launchd           : registered (daily at {time_str})")
         else:
-            print("❌ launchd           : not registered (run c-daily install)")
+            print("❌ launchd           : not registered (run cdl install)")
 
     # Check today's log — single stat() call avoids TOCTOU
     try:

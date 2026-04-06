@@ -1,5 +1,5 @@
 #!/bin/bash
-# install.sh — c-daily one-command installer
+# install.sh — cdl one-command installer
 # curl -fsSL https://raw.githubusercontent.com/atsushi729/c-daily/main/install.sh | bash
 set -euo pipefail
 
@@ -35,21 +35,20 @@ ok "Dependency check passed"
 
 # --- Install or update ---
 if [ -d "$INSTALL_DIR/.git" ]; then
-  echo "🔄 Updating c-daily..."
+  echo "🔄 Updating cdl..."
   git -C "$INSTALL_DIR" pull --quiet
   ok "Update complete"
 else
-  echo "📦 Downloading c-daily..."
+  echo "📦 Downloading cdl..."
   git clone --quiet --depth 1 "$REPO" "$INSTALL_DIR"
   ok "Download complete"
 fi
 
-# --- Add bin/c-daily to PATH, plus short `dl` alias ---
+# --- Add bin/cdl to PATH ---
 mkdir -p "$BIN_DIR"
-ln -sf "$INSTALL_DIR/bin/c-daily" "$BIN_DIR/c-daily"
-ln -sf "$INSTALL_DIR/bin/c-daily" "$BIN_DIR/dl"
-chmod +x "$INSTALL_DIR/bin/c-daily"
-ok "Linked c-daily / dl commands to $BIN_DIR"
+ln -sf "$INSTALL_DIR/bin/cdl" "$BIN_DIR/cdl"
+chmod +x "$INSTALL_DIR/bin/cdl"
+ok "Linked cdl command to $BIN_DIR"
 
 # --- Configure PATH (if not already set) ---
 SHELL_RC=""
@@ -58,10 +57,10 @@ case "${SHELL:-}" in
   */bash) SHELL_RC="${HOME}/.bashrc" ;;
 esac
 
-if [ -n "$SHELL_RC" ] && ! echo "$PATH" | grep -q "$BIN_DIR"; then
+if [ -n "$SHELL_RC" ] && ! grep -qF "$BIN_DIR" "$SHELL_RC" 2>/dev/null; then
   {
     echo ""
-    echo "# c-daily"
+    echo "# cdl"
     printf 'export PATH="%s:$PATH"\n' "$BIN_DIR"
   } >> "$SHELL_RC"
   warn "Added PATH to $SHELL_RC. To apply now:"
@@ -73,10 +72,8 @@ echo ""
 echo -e "${BOLD}🎉 Installation complete!${RESET}"
 echo ""
 echo "Next steps:"
-echo -e "  ${BOLD}dl install${RESET}   Set up Claude Code hooks and launchd"
-echo -e "  ${BOLD}dl today${RESET}     Test log generation"
-echo -e "  ${BOLD}dl help${RESET}      Show all commands"
-echo ""
-echo "(c-daily also works)"
+echo -e "  ${BOLD}cdl install${RESET}   Set up Claude Code hooks and launchd"
+echo -e "  ${BOLD}cdl today${RESET}     Test log generation"
+echo -e "  ${BOLD}cdl help${RESET}      Show all commands"
 echo ""
 echo "Documentation: $REPO"

@@ -10,16 +10,16 @@ class CDaily < Formula
   def install
     libexec.install Dir["*"]
 
-    # Rewrite shebang and path in bin/c-daily
-    (bin/"c-daily").write <<~EOS
+    # Rewrite shebang and path in bin/cdl
+    (bin/"cdl").write <<~EOS
       #!/bin/bash
       export C_DAILY_LIB="#{libexec}/lib"
-      exec bash "#{libexec}/bin/c-daily" "$@"
+      exec "#{libexec}/bin/cdl" "$@"
     EOS
   end
 
   test do
-    assert_match "c-daily v", shell_output("#{bin}/c-daily version")
+    assert_match "cdl v", shell_output("#{bin}/cdl version")
   end
 end
 

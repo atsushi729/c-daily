@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# c-daily — Claude Code daily log CLI
+# cdl — Claude Code daily log CLI
 import os
 import platform
 import subprocess
