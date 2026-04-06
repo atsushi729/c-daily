@@ -1,133 +1,87 @@
-# 🗂️ c-daily
+# cdl
 
-**A CLI tool that automatically records Claude Code activity and generates daily Markdown reviews**
+A CLI tool that automatically records Claude Code sessions and generates daily Markdown reports.
 
-[![CI](https://github.com/atsushi729/c-daily/actions/workflows/ci.yml/badge.svg)](https://github.com/atsushi729/c-daily/actions)  
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)  
+[![CI](https://github.com/atsushi729/c-daily/actions/workflows/ci.yml/badge.svg)](https://github.com/atsushi729/c-daily/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 
-# 📋 Daily Log — 2026-03-23
+> Demo video coming soon
 
-## 📊 Summary
+## Overview
 
-| Type             | Count |
-| ---------------- | ----- |
-| ✏️ File Edits    | 8     |
-| ⚡ Commands Run  | 5     |
-| 💬 Chat Sessions | 3     |
+Just use Claude Code as usual. `cdl` captures each session automatically via a Stop hook, and generates a Markdown report every night at 23:58 via launchd.
 
-## ⏱️ Timeline
+- Zero-effort recording — no manual steps after setup
+- No external dependencies — Python standard library only
+- Browsable via TUI or web UI
 
-### 10:xx
+## Commands
 
-- `10:23` ✏️ Edit: src/auth/login.py
-- `10:31` ⚡ Run: pytest tests/test_auth.py
+| Command | Description |
+|---|---|
+| `cdl install` | Initial setup — registers Claude Code hook and launchd |
+| `cdl today` | Generate and open today's report |
+| `cdl show [DATE]` | Generate and open report for a specific date (e.g. `2026-04-07`) |
+| `cdl tui` | Browse sessions in a terminal UI |
+| `cdl tui session [DATE]` | Browse sessions filtered by date |
+| `cdl tui project` | Browse by project |
+| `cdl tui daily` | Browse daily summaries |
+| `cdl web` | Open web UI in browser |
+| `cdl web --port PORT` | Open web UI on a specific port (default: 8765) |
+| `cdl status` | Check hook and launchd status |
+| `cdl raw [DATE]` | Print raw JSONL log |
+| `cdl uninstall` | Remove hooks and launchd (log data is preserved) |
+| `cdl version` | Show version |
 
-### 14:xx
+Short aliases: `t` → `tui`, `w` → `web`
 
-- `14:05` 💬 Session end: Implementing JWT refresh tokens (12 turns, $0.0231)
+## Installation
 
-## ✨ Features
-
-- **Zero-effort recording** — just use Claude Code and logs are captured automatically
-- **Auto-generated at 23:58 daily** — macOS launchd outputs Markdown before midnight
-- **No external dependencies** — uses Python standard library only
-- **Designed for future extensibility** — JSONL format allows Git hooks and other tools to append entries
-
-## 📦 Installation
-
-### Option 1: curl (recommended)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/atsushi729/c-daily/main/install.sh | bash
-c-daily install
-```
-
-### Option 2: Homebrew
+**Try without installing:**
 
 ```bash
-brew tap atsushi729/c-daily
-brew install c-daily
-c-daily install
+uvx cdl today
 ```
 
-### Option 3: git clone
+**Permanent install (recommended):**
 
 ```bash
-git clone https://github.com/atsushi729/c-daily ~/.local/share/c-daily
-ln -sf ~/.local/share/c-daily/bin/c-daily ~/.local/bin/c-daily
-c-daily install
+pipx install cdl
+cdl install
 ```
 
-## 🔧 Requirements
-
-| Item        | Version      |
-| ----------- | ------------ |
-| macOS       | 12 Monterey+ |
-| Python      | 3.9+         |
-| Claude Code | Latest       |
-
-## 🚀 Usage
+**git clone:**
 
 ```bash
-c-daily install        # Initial setup (registers hooks and launchd)
-c-daily today          # Generate and display today's log as Markdown
-c-daily show 2026-03-22  # Display log for a specific date
-c-daily status         # Check that hooks are working correctly
-c-daily raw            # Display raw log (JSONL)
-c-daily uninstall      # Remove all settings (log data is preserved)
+git clone https://github.com/atsushi729/c-daily
+cd c-daily
+python3 bin/cdl install
 ```
 
-## 📁 Log Storage
+After install, run `cdl install` once to register the Claude Code hook and launchd.
+
+## Log Storage
 
 ```
 ~/.daily-logs/
-├── 2026-03-23.md        # Generated Markdown
-├── 2026-03-24.md
+├── 2026-04-07.md        # Generated Markdown report
 └── raw/
-    └── 2026-03-23.jsonl # Raw log (JSONL format)
+    └── 2026-04-07.jsonl # Raw session records
 ```
 
-The log directory can be changed via environment variable:
+Override the directory:
 
 ```bash
 export C_DAILY_LOG_DIR="$HOME/Documents/logs"
 ```
 
-## 🗺️ Roadmap
+## Requirements
 
-- [ ] Linux (systemd timer) support
-- [ ] Automatic Git hook setup
-- [ ] Weekly summary (`c-daily weekly`)
-- [ ] Obsidian vault output
-- [ ] Multi-project cross-view
+- macOS 12+
+- Python 3.9+
+- Claude Code
 
-## 🧪 Development
-
-### Running tests
-
-```bash
-python3 -m pytest tests/ -v
-```
-
-### Linting and type checking
-
-```bash
-ruff check lib/ tests/        # lint
-ruff format lib/ tests/       # format
-mypy lib/ tests/              # type check
-```
-
-Run all checks at once:
-
-```bash
-ruff check lib/ tests/ && ruff format --check lib/ tests/ && mypy lib/ tests/
-```
-
-## 🤝 Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## 📄 License
+## License
 
 [MIT](LICENSE)
