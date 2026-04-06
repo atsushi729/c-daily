@@ -29,7 +29,6 @@ import curses
 import json
 import platform
 import subprocess
-import sys
 import unicodedata
 from datetime import date, datetime
 from pathlib import Path

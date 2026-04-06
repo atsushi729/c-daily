@@ -20,6 +20,7 @@ import contextlib
 import fcntl
 import json
 import os
+import re
 import sys
 import urllib.request
 from datetime import datetime

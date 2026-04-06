@@ -2,7 +2,6 @@
 # cdl/cmd/status.py — cdl status subcommand
 import platform
 import subprocess
-import sys
 from datetime import date
 from pathlib import Path
 
