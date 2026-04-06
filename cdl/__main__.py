@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+# cdl — Claude Code daily log CLI
+import os
+import platform
+import subprocess
+import sys
+from datetime import date
+from pathlib import Path
+
+import cdl as _cdl_pkg
+
+C_DAILY_LIB = Path(_cdl_pkg.__file__).parent
+C_DAILY_LOG_DIR = Path(os.environ.get("C_DAILY_LOG_DIR", Path.home() / ".daily-logs"))
+
+from cdl.constants import VERSION, validate_date  # noqa: E402
+
+_PROG = Path(sys.argv[0]).name
+
+
+def usage() -> None:
+    prog = _PROG
+    print(f"""{prog} v{VERSION} — Claude Code daily log auto-generator
+
+Usage:
+  {prog} install            Set up Claude Code hooks and launchd
+  {prog} today              Generate and open today's log
+  {prog} show [DATE]        Generate and open log for a specific date (e.g. 2026-03-22)
+  {prog} tui session [DATE] Browse sessions (optional date filter YYYY-MM-DD)
+  {prog} tui project        Browse projects; Enter opens session browser for selected project
+  {prog} tui daily          Browse daily summaries
+  {prog} tui [DATE]         Shorthand for tui session [DATE]
+  {prog} web [--port PORT]  Open insights web UI (default port: 8765)
+  {prog} status             Check hook and launchd status
+  {prog} raw [DATE]         Display raw log (JSONL)
+  {prog} uninstall          Remove all settings
+  {prog} version            Show version
+  {prog} help               Show this help
+
+Short aliases (slash-style also accepted, e.g. /tui):
+  t, /tui                    → tui session
+  w, /web                    → web
+
+Environment variables:
+  C_DAILY_LOG_DIR   Log storage directory (default: ~/.daily-logs)
+""")
+
+
+def open_file(path: Path) -> None:
+    if platform.system() == "Darwin":
+        subprocess.run(["open", str(path)], check=False)
+    else:
+        subprocess.run(["xdg-open", str(path)], check=False)
+
+
+def _run_module(name: str) -> None:
+    """Import and run a subcommand module from cdl.cmd."""
+    from cdl.cmd import install, status, tui, uninstall, web
+    mod_map = {
+        "install": install,
+        "status": status,
+        "tui": tui,
+        "uninstall": uninstall,
+        "web": web,
+    }
+    mod_map[name].run(C_DAILY_LIB, C_DAILY_LOG_DIR)
+
+
+_ALIASES: dict[str, str] = {
+    alias: cmd
+    for cmd, short in [("tui", "t"), ("web", "w")]
+    for alias in (short, f"/{short}", f"/{cmd}")
+}
+
+
+def main() -> None:
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
+    cmd = _ALIASES.get(cmd, cmd)
+    args = sys.argv[2:]
+
+    if cmd == "install":
+        _run_module("install")
+
+    elif cmd == "today":
+        from cdl.aggregate import generate
+        outfile = generate(date.today().isoformat(), C_DAILY_LOG_DIR)
+        if outfile.exists():
+            open_file(outfile)
+
+    elif cmd == "show":
+        target_date = args[0] if args else str(date.today())
+        validate_date(target_date)
+        from cdl.aggregate import generate
+        outfile = generate(target_date, C_DAILY_LOG_DIR)
+        if outfile.exists():
+            open_file(outfile)
+
+    elif cmd == "tui":
+        _run_module("tui")
+
+    elif cmd == "web":
+        _run_module("web")
+
+    elif cmd == "status":
+        _run_module("status")
+
+    elif cmd == "raw":
+        target_date = args[0] if args else str(date.today())
+        validate_date(target_date)
+        raw_file = C_DAILY_LOG_DIR / "raw" / f"{target_date}.jsonl"
+        if raw_file.exists():
+            print(raw_file.read_text(encoding="utf-8"), end="")
+        else:
+            print(f"⚠️  Log file not found: {raw_file}", file=sys.stderr)
+            sys.exit(1)
+
+    elif cmd == "uninstall":
+        _run_module("uninstall")
+
+    elif cmd == "version":
+        print(f"{_PROG} v{VERSION}")
+
+    elif cmd in ("help", "--help", "-h"):
+        usage()
+
+    else:
+        print(f"❌ Unknown command: {cmd}", file=sys.stderr)
+        print()
+        usage()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
