@@ -59,15 +59,15 @@ jobs:
           BIN_DIR="${HOME}/.local/bin"
           mkdir -p "$INSTALL_DIR" "$BIN_DIR"
           cp -r . "$INSTALL_DIR/"
-          ln -sf "$INSTALL_DIR/bin/c-daily" "$BIN_DIR/c-daily"
-          chmod +x "$INSTALL_DIR/bin/c-daily"
+          ln -sf "$INSTALL_DIR/bin/cdl" "$BIN_DIR/cdl"
+          chmod +x "$INSTALL_DIR/bin/cdl"
           echo "$BIN_DIR" >> $GITHUB_PATH
 
-      - name: Smoke test — c-daily version
-        run: c-daily version
+      - name: Smoke test — cdl version
+        run: cdl version
 
-      - name: Smoke test — c-daily help
-        run: c-daily help
+      - name: Smoke test — cdl help
+        run: cdl help
 
-      - name: Smoke test — c-daily today (空ログ)
-        run: c-daily today
+      - name: Smoke test — cdl today (空ログ)
+        run: cdl today
