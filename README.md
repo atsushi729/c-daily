@@ -18,21 +18,21 @@ Just use Claude Code as usual. `cdl` captures each session automatically via a S
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `cdl install` | Initial setup — registers Claude Code hook and launchd |
-| `cdl today` | Generate and open today's report |
-| `cdl show [DATE]` | Generate and open report for a specific date (e.g. `2026-04-07`) |
-| `cdl tui` | Browse sessions in a terminal UI |
-| `cdl tui session [DATE]` | Browse sessions filtered by date |
-| `cdl tui project` | Browse by project |
-| `cdl tui daily` | Browse daily summaries |
-| `cdl web` | Open web UI in browser |
-| `cdl web --port PORT` | Open web UI on a specific port (default: 8765) |
-| `cdl status` | Check hook and launchd status |
-| `cdl raw [DATE]` | Print raw JSONL log |
-| `cdl uninstall` | Remove hooks and launchd (log data is preserved) |
-| `cdl version` | Show version |
+| Command                  | Description                                                      |
+| ------------------------ | ---------------------------------------------------------------- |
+| `cdl install`            | Initial setup — registers Claude Code hook and launchd           |
+| `cdl today`              | Generate and open today's report                                 |
+| `cdl show [DATE]`        | Generate and open report for a specific date (e.g. `2026-04-07`) |
+| `cdl tui`                | Browse sessions in a terminal UI                                 |
+| `cdl tui session [DATE]` | Browse sessions filtered by date                                 |
+| `cdl tui project`        | Browse by project                                                |
+| `cdl tui daily`          | Browse daily summaries                                           |
+| `cdl web`                | Open web UI in browser                                           |
+| `cdl web --port PORT`    | Open web UI on a specific port (default: 8765)                   |
+| `cdl status`             | Check hook and launchd status                                    |
+| `cdl raw [DATE]`         | Print raw JSONL log                                              |
+| `cdl uninstall`          | Remove hooks and launchd (log data is preserved)                 |
+| `cdl version`            | Show version                                                     |
 
 Short aliases: `t` → `tui`, `w` → `web`
 
@@ -41,7 +41,9 @@ Short aliases: `t` → `tui`, `w` → `web`
 **Try without installing:**
 
 ```bash
-uvx cdl today
+uvx cdl tui         # Show list of session history
+uvx cdl tui project # Show list of project
+uvx cdl web         # Show list of project in GUI
 ```
 
 **Permanent install (recommended):**
