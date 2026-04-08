@@ -6,7 +6,14 @@ A CLI tool that automatically records Claude Code sessions and generates daily M
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 
-> Demo video coming soon
+### TUI Demo
+
+https://github.com/atsushi729/c-daily/assets/tui-demo-final.mp4
+
+### Web UI Demo
+
+https://github.com/atsushi729/c-daily/assets/c-daily-web-demo.mp4
+
 
 ## Overview
 
