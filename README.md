@@ -8,11 +8,11 @@ A CLI tool that automatically records Claude Code sessions and generates daily M
 
 ### TUI Demo
 
-<video src="assets/tui-demo-final.mp4" poster="assets/tui-demo-poster.jpg" controls width="100%"></video>
+[TUI Demo](https://github.com/user-attachments/assets/97179b59-a82c-4c50-a7ba-f1078a19f03f)
 
 ### Web UI Demo
 
-<video src="assets/c-daily-web-demo.mp4" controls width="100%"></video>
+[Web UI Demo](https://github.com/user-attachments/assets/d93de088-492a-47e9-87cf-753465c50541)
 
 
 ## Overview
