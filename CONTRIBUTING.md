@@ -7,8 +7,7 @@ Contributions to c-daily are welcome!
 ```bash
 git clone https://github.com/atsushi729/c-daily
 cd c-daily
-pip install pytest
-pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 ## Reporting Issues
@@ -20,7 +19,7 @@ Please report bugs and feature requests via [GitHub Issues](https://github.com/a
 - OS and version (output of `sw_vers`)
 - Python version (`python3 --version`)
 - Claude Code version
-- Output of `c-daily status`
+- Output of `cdl status`
 - Steps to reproduce and expected behavior
 
 ## Pull Requests
@@ -41,7 +40,7 @@ Please report bugs and feature requests via [GitHub Issues](https://github.com/a
 - [ ] Linux (systemd timer) support
 - [ ] Automatic Git hook setup
 - [ ] Obsidian vault output
-- [ ] Weekly summary (`c-daily weekly`)
+- [ ] Weekly summary (`cdl weekly`)
 - [ ] Multi-project support
 
 ## Code Guidelines

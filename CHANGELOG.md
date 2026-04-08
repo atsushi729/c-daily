@@ -10,7 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Linux (systemd timer) support
 - Automatic Git hook setup
-- Weekly summary (`c-daily weekly`)
+- Weekly summary (`cdl weekly`)
+
+## [0.2.0] - Unreleased
+
+### Added
+- `cdl tui` — browse sessions in a terminal UI
+- `cdl tui session [DATE]` — browse sessions filtered by date
+- `cdl tui project` — browse by project
+- `cdl tui daily` — browse daily summaries
+- `cdl web` — open web UI in browser
+- `cdl web --port PORT` — open web UI on a specific port (default: 8765)
+- `cdl version` — show version
+- Short aliases: `t` → `tui`, `w` → `web`
+- `uvx cdl` support for trying without installing
+
+### Changed
+- Renamed CLI from `c-daily` to `cdl`
 
 ## [0.1.0] - 2026-03-23
 
