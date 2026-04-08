@@ -634,6 +634,6 @@ def not_found_html(path: str) -> str:
   <h1>Not found</h1>
 </header>
 <main>
-  <p class="empty">No page at <code>{path}</code></p>
+  <p class="empty">No page at <code>{_html_lib.escape(path)}</code></p>
 </main>"""
     return _page("Not found", body)
